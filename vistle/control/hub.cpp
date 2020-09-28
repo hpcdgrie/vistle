@@ -1832,7 +1832,14 @@ bool Hub::handlePriv(const message::Connect &conn) {
     sendUi(c);
     sendManager(c);
     sendSlaves(c);
-
+    int rdy = m_stateTracker.getModuleState(c.getModuleA());
+    if (rdy & StateObserver::Busy)
+    {
+        auto exec = make.message<message::Execute>(message::Execute::Prepare, c.getModuleB(), m_execCount);
+        sendUi(exec);
+        sendManager(exec);
+        sendSlaves(exec);
+    }
     return true;
 }
 
@@ -1843,7 +1850,13 @@ bool Hub::handlePriv(const message::Disconnect &disc) {
     sendUi(d);
     sendManager(d);
     sendSlaves(d);
-
+    if (m_stateTracker.getModuleState(d.getModuleB() & StateObserver::Busy))
+    {
+        auto cancel = make.message<message::Execute>(message::Execute::Reduce, d.getModuleB(), m_execCount);
+        sendUi(cancel);
+        sendManager(cancel);
+        sendSlaves(cancel);
+    }
     return true;
 }
 
