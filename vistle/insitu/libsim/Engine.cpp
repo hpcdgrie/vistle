@@ -56,7 +56,7 @@ Engine *Engine::EngineInstance() {
 }
 
 void Engine::DisconnectSimulation() {
-
+    std::cerr << "Enigne [" << instance->m_rank  << "/"<< instance->m_mpiSize << "] disconnecting..." << endl;
     instance->m_messageHandler.send(ConnectionClosed{true});
     delete instance;
     instance = nullptr;
