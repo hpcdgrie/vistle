@@ -14,15 +14,18 @@ This is usefull in functions that only want to print under certain circumstances
 #endif
 
 */
-struct DoNotPrint
-{
-  public:
-    template <typename T>
-    constexpr const DoNotPrint &operator<<(const T &t) const {
+struct DoNotPrint {
+public:
+    template<typename T>
+    constexpr const DoNotPrint &operator<<(const T &t) const
+    {
         return *this;
     }
 
-    constexpr const DoNotPrint &operator<<(std::ostream &(*pManip)(std::ostream &)) const { return *this; }
+    constexpr const DoNotPrint &operator<<(std::ostream &(*pManip)(std::ostream &)) const
+    {
+        return *this;
+    }
 };
 static const DoNotPrint DoNotPrintInstance;
 
@@ -30,28 +33,27 @@ static const DoNotPrint DoNotPrintInstance;
     prints to stream if condition is true
 */
 
-struct Print_if
-{
-  public:
-    Print_if(bool b, std::ostream &stream = std::cerr)
-        : m_b(b)
-        , m_stream(stream) {}
-    template <typename T>
-    Print_if &operator<<(const T &t) {
+struct Print_if {
+public:
+    Print_if(bool b, std::ostream &stream = std::cerr): m_b(b), m_stream(stream) {}
+    template<typename T>
+    Print_if &operator<<(const T &t)
+    {
         if (m_b) {
             m_stream << t;
         }
         return *this;
     }
 
-    Print_if &operator<<(std::ostream &(*pManip)(std::ostream &)) {
+    Print_if &operator<<(std::ostream &(*pManip)(std::ostream &))
+    {
         if (m_b) {
             m_stream << pManip;
         }
         return *this;
     }
 
-  private:
+private:
     bool m_b;
     std::ostream &m_stream;
 };

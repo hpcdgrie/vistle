@@ -10,11 +10,11 @@ namespace message {
 // When the connection is closed returns EngineMEssageType::ConnectionClosed and becomes uninitialized.
 // while uninitialized calls to send and received are ignored.
 // Received Messages are broadcasted to all ranks so make sure they all call receive together.
-class V_INSITUMESSAGEEXPORT InSituTcp
-{
-  public:
-    template <typename SomeMessage>
-    bool send(const SomeMessage &msg) const {
+class V_INSITUMESSAGEEXPORT InSituTcp {
+public:
+    template<typename SomeMessage>
+    bool send(const SomeMessage &msg) const
+    {
         if (!m_initialized) {
             std::cerr << "InSituTcpMessage uninitialized: can not send message!" << std::endl;
             return false;
@@ -40,11 +40,12 @@ class V_INSITUMESSAGEEXPORT InSituTcp
         }
         return error;
     }
-    void initialize(std::shared_ptr<boost::asio::ip::tcp::socket> socket, boost::mpi::communicator comm);
+    void initialize(std::shared_ptr<boost::asio::ip::tcp::socket> socket,
+                    boost::mpi::communicator comm);
     bool isInitialized();
     insitu::message::Message recv();
 
-  private:
+private:
     bool m_initialized = false;
     boost::mpi::communicator m_comm;
     boost::asio::ip::tcp::socket *m_socket;

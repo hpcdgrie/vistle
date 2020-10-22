@@ -8,18 +8,17 @@ namespace insitu {
 namespace message {
 constexpr size_t ShmMessageMaxSize = 1000;
 constexpr unsigned int ShmMessageQueueLenght = 20;
-struct ShmMsg
-{
+struct ShmMsg {
     int type = 0;
     size_t size = 0;
     std::array<char, ShmMessageMaxSize> buf;
 };
 
-class V_INSITUMESSAGEEXPORT InSituShmMessage
-{
-  public:
-    template <typename SomeMessage>
-    bool send(const SomeMessage &msg) const { // not thread safe
+class V_INSITUMESSAGEEXPORT InSituShmMessage {
+public:
+    template<typename SomeMessage>
+    bool send(const SomeMessage &msg) const
+    { // not thread safe
         if (!m_initialized) {
             std::cerr << "ShmMessage uninitialized: can not send message!" << std::endl;
             return false;
@@ -50,7 +49,7 @@ class V_INSITUMESSAGEEXPORT InSituShmMessage
         }
 
         try {
-            for (auto msg : msgs) {
+            for (auto msg: msgs) {
                 m_msqs[1]->send((void *)&msg, sizeof(msg), 0);
             }
         } catch (const boost::interprocess::interprocess_exception &ex) {
@@ -60,9 +59,9 @@ class V_INSITUMESSAGEEXPORT InSituShmMessage
 
         return true;
     }
-    void initialize(int rank);                             // create a msq
+    void initialize(int rank); // create a msq
     void initialize(const std::string &msqName, int rank); // connect to a msq
-    void reset();                                          // set the state back to uninitialized
+    void reset(); // set the state back to uninitialized
     bool isInitialized();
     void removeShm();
     std::string name();
@@ -71,15 +70,15 @@ class V_INSITUMESSAGEEXPORT InSituShmMessage
     insitu::message::Message timedRecv(size_t timeInSec);
     ~InSituShmMessage();
 
-  private:
+private:
     bool m_initialized = false;
     std::array<std::unique_ptr<boost::interprocess::message_queue>, 2> m_msqs;
     bool m_creator = false; // if true we created shm objects which we have to remove
     const std::string m_msqName = "vistle_shmMessage_";
     const std::string m_recvSuffix =
-        "_recv_sensei"; // signature must contain _recv_ for shm::cleanAll to remove these files
+    "_recv_sensei"; // signature must contain _recv_ for shm::cleanAll to remove these files
     const std::string m_sendSuffix =
-        "_send_sensei"; // signature must contain _send_ for shm::cleanAll to remove these files
+    "_send_sensei"; // signature must contain _send_ for shm::cleanAll to remove these files
     size_t m_iteration = 0;
 };
 

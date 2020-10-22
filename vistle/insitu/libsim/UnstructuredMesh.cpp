@@ -21,24 +21,24 @@ namespace vistle {
 namespace insitu {
 namespace libsim {
 namespace UnstructuredMesh {
-vistle::Object::ptr get(const visit_handle &meshHandle, message::SyncShmIDs &creator) {
+vistle::Object::ptr get(const visit_handle &meshHandle, message::SyncShmIDs &creator)
+{
     if (simv2_UnstructuredMesh_check(meshHandle) == VISIT_OKAY) {
-        vistle::UnstructuredGrid::ptr mesh = creator.createVistleObject<vistle::UnstructuredGrid>(0, 0, 0);
+        vistle::UnstructuredGrid::ptr mesh =
+        creator.createVistleObject<vistle::UnstructuredGrid>(0, 0, 0);
         detail::fillTypeConnAndElemLists(meshHandle, mesh);
 
         visit_handle coordHandles[4]; // handles to variable data pos 3 is for interleaved data
         int ndims;
         int coordMode;
-        v2check(simv2_UnstructuredMesh_getCoords, meshHandle, &ndims, &coordMode, &coordHandles[0], &coordHandles[1],
-                &coordHandles[2], &coordHandles[3]);
+        v2check(simv2_UnstructuredMesh_getCoords, meshHandle, &ndims, &coordMode, &coordHandles[0],
+                &coordHandles[1], &coordHandles[2], &coordHandles[3]);
 
         switch (coordMode) {
-        case VISIT_COORD_MODE_INTERLEAVED:
-        {
+        case VISIT_COORD_MODE_INTERLEAVED: {
             detail::InterleavedAllocAndFill(coordHandles[3], mesh, ndims);
         } break;
-        case VISIT_COORD_MODE_SEPARATE:
-        {
+        case VISIT_COORD_MODE_SEPARATE: {
             detail::SeparateAllocAndFill(ndims, coordHandles, mesh);
         } break;
         default:
@@ -53,7 +53,9 @@ vistle::Object::ptr get(const visit_handle &meshHandle, message::SyncShmIDs &cre
 
 namespace detail {
 
-void SeparateAllocAndFill(int dim, const visit_handle coordHandles[4], std::shared_ptr<vistle::UnstructuredGrid> grid) {
+void SeparateAllocAndFill(int dim, const visit_handle coordHandles[4],
+                          std::shared_ptr<vistle::UnstructuredGrid> grid)
+{
     for (int i = 0; i < dim; ++i) {
         auto a = getVariableData(coordHandles[i]);
         grid->x(i).resize(a.size);
@@ -61,7 +63,9 @@ void SeparateAllocAndFill(int dim, const visit_handle coordHandles[4], std::shar
     }
 }
 
-void InterleavedAllocAndFill(const visit_handle &coordHandle, std::shared_ptr<vistle::UnstructuredGrid> grid, int dim) {
+void InterleavedAllocAndFill(const visit_handle &coordHandle,
+                             std::shared_ptr<vistle::UnstructuredGrid> grid, int dim)
+{
     auto a = getVariableData(coordHandle);
     std::array<vistle::Scalar *, 3> gridCoords;
     for (size_t i = 0; i < static_cast<size_t>(dim); ++i) {
@@ -71,7 +75,8 @@ void InterleavedAllocAndFill(const visit_handle &coordHandle, std::shared_ptr<vi
     transformInterleavedArray(a.data, gridCoords, a.size, dataTypeToVistle(a.type), dim);
 }
 
-void addGhost(const visit_handle &meshHandle, vistle::UnstructuredGrid::ptr grid) {
+void addGhost(const visit_handle &meshHandle, vistle::UnstructuredGrid::ptr grid)
+{
     visit_handle ghostCellHandle;
     v2check(simv2_UnstructuredMesh_getGhostCells, meshHandle, &ghostCellHandle);
     if (ghostCellHandle != VISIT_INVALID_HANDLE) {
@@ -90,7 +95,8 @@ void addGhost(const visit_handle &meshHandle, vistle::UnstructuredGrid::ptr grid
     }
 }
 
-void fillTypeConnAndElemLists(const visit_handle &meshHandle, vistle::UnstructuredGrid::ptr mesh) {
+void fillTypeConnAndElemLists(const visit_handle &meshHandle, vistle::UnstructuredGrid::ptr mesh)
+{
     auto connListData = getConListFromSim(meshHandle);
 
     mesh->tl().reserve(connListData.numElements);
@@ -103,16 +109,17 @@ void fillTypeConnAndElemLists(const visit_handle &meshHandle, vistle::Unstructur
         ++idx;
         auto elemType = libsim::vertexTypeToVistle(type);
         if (elemType == vistle::UnstructuredGrid::Type::NONE) {
-            std::cerr << "UnstructuredMesh warning: type " << type << " is not converted to a vistle type...returning"
-                      << std::endl;
+            std::cerr << "UnstructuredMesh warning: type " << type
+                      << " is not converted to a vistle type...returning" << std::endl;
             return;
         }
 
         elemIndex += libsim::getNumVertices(elemType);
 
         if (idx + libsim::getNumVertices(elemType) > connListData.data.size) {
-            std::cerr << "element " << i << " with idx = " << idx << " and type " << elemType << "with typesize"
-                      << libsim::getNumVertices(elemType) << " is outside of given elementList data!" << std::endl;
+            std::cerr << "element " << i << " with idx = " << idx << " and type " << elemType
+                      << "with typesize" << libsim::getNumVertices(elemType)
+                      << " is outside of given elementList data!" << std::endl;
             break;
         }
         mesh->el().push_back(elemIndex);
@@ -125,7 +132,8 @@ void fillTypeConnAndElemLists(const visit_handle &meshHandle, vistle::Unstructur
     }
 }
 
-connListData getConListFromSim(const visit_handle &meshHandle) {
+connListData getConListFromSim(const visit_handle &meshHandle)
+{
     visit_handle connListHandle;
     connListData cld;
     v2check(simv2_UnstructuredMesh_getConnectivity, meshHandle, &cld.numElements, &connListHandle);
@@ -138,7 +146,8 @@ connListData getConListFromSim(const visit_handle &meshHandle) {
 
 } // namespace detail
 
-size_t getNumElements(int dims[3]) {
+size_t getNumElements(int dims[3])
+{
     size_t numElements = 1;
     for (size_t i = 0; i < 3; i++) {
         numElements *= std::max(dims[i] - 1, 1);
@@ -146,7 +155,8 @@ size_t getNumElements(int dims[3]) {
     return numElements;
 }
 
-size_t getNumVertices(int dims[3]) {
+size_t getNumVertices(int dims[3])
+{
     size_t numVerts = 1;
     for (size_t i = 0; i < 3; i++) {
         numVerts *= dims[i];
@@ -154,7 +164,8 @@ size_t getNumVertices(int dims[3]) {
     return numVerts;
 }
 
-void preventNull(int dims[3], void *data[3]) {
+void preventNull(int dims[3], void *data[3])
+{
     static double zero = 0;
     for (size_t i = 0; i < 3; i++) {
         dims[i] = std::max(dims[i], 1);
@@ -164,9 +175,11 @@ void preventNull(int dims[3], void *data[3]) {
     }
 }
 
-void allocateFields(vistle::UnstructuredGrid::ptr grid, size_t totalNumVerts, size_t numVertices, size_t iteration,
-                    int numIterations, std::array<vistle::Scalar *, 3> &gridCoords, size_t totalNumElements,
-                    size_t numElements, int numCorners) {
+void allocateFields(vistle::UnstructuredGrid::ptr grid, size_t totalNumVerts, size_t numVertices,
+                    size_t iteration, int numIterations,
+                    std::array<vistle::Scalar *, 3> &gridCoords, size_t totalNumElements,
+                    size_t numElements, int numCorners)
+{
     // reserve memory for the arrays, /assume we have the same sub-grid size for the rest to reduce the amout of
     // re-allocations
     if (grid->x().size() < totalNumVerts + numVertices) {
@@ -176,12 +189,14 @@ void allocateFields(vistle::UnstructuredGrid::ptr grid, size_t totalNumVerts, si
                       grid->z().begin() + totalNumVerts};
     }
     if (grid->cl().size() < (totalNumElements + numElements) * numCorners) {
-        grid->cl().resize((totalNumElements + numElements * (numIterations - iteration)) * numCorners);
+        grid->cl().resize((totalNumElements + numElements * (numIterations - iteration)) *
+                          numCorners);
     }
 }
 
-void setFinalFildSizes(vistle::UnstructuredGrid::ptr grid, size_t totalNumVerts, size_t totalNumElements,
-                       int numCorners) {
+void setFinalFildSizes(vistle::UnstructuredGrid::ptr grid, size_t totalNumVerts,
+                       size_t totalNumElements, int numCorners)
+{
     assert(grid->getSize() >= totalNumVerts);
     grid->setSize(totalNumVerts);
 
@@ -192,7 +207,9 @@ void setFinalFildSizes(vistle::UnstructuredGrid::ptr grid, size_t totalNumVerts,
     grid->el().resize(totalNumElements + 1);
 }
 
-void fillRemainingFields(vistle::UnstructuredGrid::ptr grid, size_t totalNumElements, int numCorners, int dim) {
+void fillRemainingFields(vistle::UnstructuredGrid::ptr grid, size_t totalNumElements,
+                         int numCorners, int dim)
+{
     std::fill(grid->tl().begin(), grid->tl().end(),
               dim == 2 ? (const vistle::Byte)vistle::UnstructuredGrid::QUAD
                        : (const vistle::Byte)vistle::UnstructuredGrid::HEXAHEDRON);
@@ -206,7 +223,9 @@ void fillRemainingFields(vistle::UnstructuredGrid::ptr grid, size_t totalNumElem
 }
 
 void fillStructuredGridConnectivityList(const int *dims, vistle::Index *connectivityList,
-                                        vistle::Index startOfGridIndex, ConnectivityListPattern pattern) {
+                                        vistle::Index startOfGridIndex,
+                                        ConnectivityListPattern pattern)
+{
     // construct connectivity list (all hexahedra)
     using namespace vistle;
     Index numVert[3];
@@ -225,23 +244,29 @@ void fillStructuredGridConnectivityList(const int *dims, vistle::Index *connecti
                 for (i[o[2]] = 0; i[o[2]] < numElements[o[2]]; ++i[o[2]]) {
                     const Index baseInsertionIndex = el * 8;
                     connectivityList[baseInsertionIndex + 0] =
-                        startOfGridIndex + pattern.vertexIndex(i[0], i[1], i[2], numVert); // 0       7 -------- 6
+                    startOfGridIndex +
+                    pattern.vertexIndex(i[0], i[1], i[2], numVert); // 0       7 -------- 6
                     connectivityList[baseInsertionIndex + 1] =
-                        startOfGridIndex + pattern.vertexIndex(i[0] + 1, i[1], i[2], numVert); // 1      /|         /|
+                    startOfGridIndex +
+                    pattern.vertexIndex(i[0] + 1, i[1], i[2], numVert); // 1      /|         /|
                     connectivityList[baseInsertionIndex + 2] =
-                        startOfGridIndex +
-                        pattern.vertexIndex(i[0] + 1, i[1] + 1, i[2], numVert); // 2     / |        / |
+                    startOfGridIndex +
+                    pattern.vertexIndex(i[0] + 1, i[1] + 1, i[2], numVert); // 2     / |        / |
                     connectivityList[baseInsertionIndex + 3] =
-                        startOfGridIndex + pattern.vertexIndex(i[0], i[1] + 1, i[2], numVert); // 3    4 -------- 5  |
+                    startOfGridIndex +
+                    pattern.vertexIndex(i[0], i[1] + 1, i[2], numVert); // 3    4 -------- 5  |
                     connectivityList[baseInsertionIndex + 4] =
-                        startOfGridIndex + pattern.vertexIndex(i[0], i[1], i[2] + 1, numVert); // 4    |  3-------|--2
+                    startOfGridIndex +
+                    pattern.vertexIndex(i[0], i[1], i[2] + 1, numVert); // 4    |  3-------|--2
                     connectivityList[baseInsertionIndex + 5] =
-                        startOfGridIndex +
-                        pattern.vertexIndex(i[0] + 1, i[1], i[2] + 1, numVert); // 5    | /        | /
+                    startOfGridIndex +
+                    pattern.vertexIndex(i[0] + 1, i[1], i[2] + 1, numVert); // 5    | /        | /
                     connectivityList[baseInsertionIndex + 6] =
-                        startOfGridIndex + pattern.vertexIndex(i[0] + 1, i[1] + 1, i[2] + 1, numVert); // 6    |/ |/
+                    startOfGridIndex +
+                    pattern.vertexIndex(i[0] + 1, i[1] + 1, i[2] + 1, numVert); // 6    |/ |/
                     connectivityList[baseInsertionIndex + 7] =
-                        startOfGridIndex + pattern.vertexIndex(i[0], i[1] + 1, i[2] + 1, numVert); // 7    0----------1
+                    startOfGridIndex +
+                    pattern.vertexIndex(i[0], i[1] + 1, i[2] + 1, numVert); // 7    0----------1
 
                     ++el;
                 }
@@ -256,13 +281,13 @@ void fillStructuredGridConnectivityList(const int *dims, vistle::Index *connecti
                 for (i[o[2]] = 0; i[o[2]] < numElements[o[2]]; i[o[2]]++) {
                     const Index baseInsertionIndex = el * 4;
                     connectivityList[baseInsertionIndex + 0] =
-                        startOfGridIndex + pattern.vertexIndex(i[0], i[1], 0, numVert);
+                    startOfGridIndex + pattern.vertexIndex(i[0], i[1], 0, numVert);
                     connectivityList[baseInsertionIndex + 1] =
-                        startOfGridIndex + pattern.vertexIndex(i[0] + 1, i[1], 0, numVert);
+                    startOfGridIndex + pattern.vertexIndex(i[0] + 1, i[1], 0, numVert);
                     connectivityList[baseInsertionIndex + 2] =
-                        startOfGridIndex + pattern.vertexIndex(i[0] + 1, i[1] + 1, 0, numVert);
+                    startOfGridIndex + pattern.vertexIndex(i[0] + 1, i[1] + 1, 0, numVert);
                     connectivityList[baseInsertionIndex + 3] =
-                        startOfGridIndex + pattern.vertexIndex(i[0], i[1] + 1, 0, numVert);
+                    startOfGridIndex + pattern.vertexIndex(i[0], i[1] + 1, 0, numVert);
                     ++el;
                 }
             }
@@ -270,18 +295,19 @@ void fillStructuredGridConnectivityList(const int *dims, vistle::Index *connecti
     }
 }
 
-VtkConListPattern::VtkConListPattern()
-    : ConnectivityListPattern({VTKVertexIndex, {2, 1, 0}}) {}
+VtkConListPattern::VtkConListPattern(): ConnectivityListPattern({VTKVertexIndex, {2, 1, 0}})
+{}
 
 ConnectivityListPattern::ConnectivityListPattern()
-    : vertexIndex(vistle::StructuredGridBase::vertexIndex)
-    , order({0, 1, 2}) {}
+: vertexIndex(vistle::StructuredGridBase::vertexIndex), order({0, 1, 2})
+{}
 
-ConnectivityListPattern::ConnectivityListPattern(vistle::Index (*getVertexIndex)(vistle::Index, vistle::Index,
-                                                                                 vistle::Index, const vistle::Index[3]),
-                                                 std::array<int, 3> loopOrder)
-    : vertexIndex(getVertexIndex)
-    , order(loopOrder) {}
+ConnectivityListPattern::ConnectivityListPattern(
+vistle::Index (*getVertexIndex)(vistle::Index, vistle::Index, vistle::Index,
+                                const vistle::Index[3]),
+std::array<int, 3> loopOrder)
+: vertexIndex(getVertexIndex), order(loopOrder)
+{}
 
 } // namespace UnstructuredMesh
 

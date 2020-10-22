@@ -43,7 +43,8 @@ simv2_create_engine(void *)
 }
 #endif
 
-void *simv2_get_engine() {
+void *simv2_get_engine()
+{
     // Set the engine creation callback so it will create our Engine subclass.
     // EngineBase::SetEngineCreationCallback(simv2_create_engine, NULL);
 
@@ -81,14 +82,21 @@ void *simv2_get_engine() {
 //
 // ****************************************************************************
 
-static int simv2_initialize_helper(void *e, int argc, char *argv[], bool batch) {
+static int simv2_initialize_helper(void *e, int argc, char *argv[], bool batch)
+{
     Engine *engine = (Engine *)(e);
     return engine->initialize(argc, argv);
 }
 
-int simv2_initialize(void *e, int argc, char *argv[]) { return simv2_initialize_helper(e, argc, argv, false); }
+int simv2_initialize(void *e, int argc, char *argv[])
+{
+    return simv2_initialize_helper(e, argc, argv, false);
+}
 
-int simv2_initialize_batch(void *e, int argc, char *argv[]) { return simv2_initialize_helper(e, argc, argv, true); }
+int simv2_initialize_batch(void *e, int argc, char *argv[])
+{
+    return simv2_initialize_helper(e, argc, argv, true);
+}
 
 // ****************************************************************************
 // Method: simv2_connect_viewer
@@ -111,7 +119,10 @@ int simv2_initialize_batch(void *e, int argc, char *argv[]) { return simv2_initi
 //
 // ****************************************************************************
 
-int simv2_connect_viewer(void *e, int argc, char *argv[]) { return true; }
+int simv2_connect_viewer(void *e, int argc, char *argv[])
+{
+    return true;
+}
 
 // ****************************************************************************
 // Method: simv2_get_descriptor
@@ -133,7 +144,8 @@ int simv2_connect_viewer(void *e, int argc, char *argv[]) { return true; }
 //
 // ****************************************************************************
 
-int simv2_get_descriptor(void *e) {
+int simv2_get_descriptor(void *e)
+{
     Engine *engine = (Engine *)(e);
     return engine->GetInputSocket();
     return -1;
@@ -160,7 +172,8 @@ int simv2_get_descriptor(void *e) {
 //
 // ****************************************************************************
 
-int simv2_process_input(void *e) {
+int simv2_process_input(void *e)
+{
     Engine *engine = (Engine *)(e);
 
     return engine->fetchNewModuleState();
@@ -186,7 +199,8 @@ int simv2_process_input(void *e) {
 //
 // ****************************************************************************
 
-void simv2_time_step_changed(void *e) {
+void simv2_time_step_changed(void *e)
+{
     Engine *engine = (Engine *)(e);
     engine->SimulationTimeStepChanged();
 }
@@ -212,7 +226,8 @@ void simv2_time_step_changed(void *e) {
 //
 // ****************************************************************************
 
-void simv2_execute_command(void *e, const char *command) {
+void simv2_execute_command(void *e, const char *command)
+{
     if (command != NULL) {
         Engine *engine = (Engine *)(e);
         engine->SimulationInitiateCommand(command);
@@ -232,7 +247,8 @@ void simv2_execute_command(void *e, const char *command) {
 //
 // ****************************************************************************
 
-void simv2_disconnect() {
+void simv2_disconnect()
+{
     Engine::DisconnectSimulation();
 
     DataCallbacksCleanup();
@@ -259,7 +275,10 @@ void simv2_disconnect() {
 //
 // ****************************************************************************
 
-void simv2_set_slave_process_callback(void (*spic)()) { Engine::EngineInstance()->setSlaveComandCallback(spic); }
+void simv2_set_slave_process_callback(void (*spic)())
+{
+    Engine::EngineInstance()->setSlaveComandCallback(spic);
+}
 
 // ****************************************************************************
 // Method: simv2_set_command_callback
@@ -284,7 +303,9 @@ void simv2_set_slave_process_callback(void (*spic)()) { Engine::EngineInstance()
 //
 // ****************************************************************************
 
-void simv2_set_command_callback(void *e, void (*sc)(const char *, const char *, void *), void *scdata) {
+void simv2_set_command_callback(void *e, void (*sc)(const char *, const char *, void *),
+                                void *scdata)
+{
     Engine *engine = (Engine *)(e);
     engine->SetSimulationCommandCallback(sc, scdata);
 }
@@ -310,7 +331,10 @@ void simv2_set_command_callback(void *e, void (*sc)(const char *, const char *, 
 //
 // ****************************************************************************
 
-void simv2_debug_logs(int level, const char *msg) { std::cerr << msg << std::endl; }
+void simv2_debug_logs(int level, const char *msg)
+{
+    std::cerr << msg << std::endl;
+}
 
 // ****************************************************************************
 // Method: simv2_set_mpicomm
@@ -332,7 +356,10 @@ void simv2_debug_logs(int level, const char *msg) { std::cerr << msg << std::end
 //
 // ****************************************************************************
 
-int simv2_set_mpicomm(void *comm) { return Engine::EngineInstance()->setMpiComm(comm); }
+int simv2_set_mpicomm(void *comm)
+{
+    return Engine::EngineInstance()->setMpiComm(comm);
+}
 
 // ****************************************************************************
 // Method: simv2_set_mpicomm_f
@@ -355,7 +382,8 @@ int simv2_set_mpicomm(void *comm) { return Engine::EngineInstance()->setMpiComm(
 //
 // ****************************************************************************
 
-int simv2_set_mpicomm_f(int *comm) {
+int simv2_set_mpicomm_f(int *comm)
+{
 #ifdef PARALLEL
     MPI_Fint *commF = (MPI_Fint *)comm;
     static MPI_Comm commC = MPI_Comm_f2c(*commF);
@@ -393,7 +421,10 @@ int simv2_set_mpicomm_f(int *comm) {
 //
 // ****************************************************************************
 
-int simv2_save_window(void *e, const char *filename, int w, int h, int format) { return false; }
+int simv2_save_window(void *e, const char *filename, int w, int h, int format)
+{
+    return false;
+}
 
 // ****************************************************************************
 // Method: simv2_add_plot
@@ -417,7 +448,10 @@ int simv2_save_window(void *e, const char *filename, int w, int h, int format) {
 //
 // ****************************************************************************
 
-int simv2_add_plot(void *e, const char *plotType, const char *var) { return false; }
+int simv2_add_plot(void *e, const char *plotType, const char *var)
+{
+    return false;
+}
 
 // ****************************************************************************
 // Method: simv2_add_operator
@@ -441,7 +475,10 @@ int simv2_add_plot(void *e, const char *plotType, const char *var) { return fals
 //
 // ****************************************************************************
 
-int simv2_add_operator(void *e, const char *operatorType, int applyToAll) { return false; }
+int simv2_add_operator(void *e, const char *operatorType, int applyToAll)
+{
+    return false;
+}
 
 // ****************************************************************************
 // Method: simv2_draw_plots
@@ -463,7 +500,8 @@ int simv2_add_operator(void *e, const char *operatorType, int applyToAll) { retu
 //
 // ****************************************************************************
 
-int simv2_draw_plots(void *e) {
+int simv2_draw_plots(void *e)
+{
     Engine *engine = (Engine *)(e);
     return engine->sendData();
 }
@@ -488,7 +526,8 @@ int simv2_draw_plots(void *e) {
 //
 // ****************************************************************************
 
-int simv2_delete_active_plots(void *e) {
+int simv2_delete_active_plots(void *e)
+{
     Engine *engine = (Engine *)(e);
     engine->DeleteData();
     return true;
@@ -516,7 +555,10 @@ int simv2_delete_active_plots(void *e) {
 //
 // ****************************************************************************
 
-int simv2_set_active_plots(void *e, const int *ids, int nids) { return false; }
+int simv2_set_active_plots(void *e, const int *ids, int nids)
+{
+    return false;
+}
 
 // ****************************************************************************
 // Method: simv2_change_plot_var
@@ -540,7 +582,10 @@ int simv2_set_active_plots(void *e, const int *ids, int nids) { return false; }
 //
 // ****************************************************************************
 
-int simv2_change_plot_var(void *e, const char *var, int all) { return false; }
+int simv2_change_plot_var(void *e, const char *var, int all)
+{
+    return false;
+}
 
 // ****************************************************************************
 // Method: simv2_set_plot_options
@@ -566,7 +611,9 @@ int simv2_change_plot_var(void *e, const char *var, int all) { return false; }
 //
 // ****************************************************************************
 
-int simv2_set_plot_options(void *e, const char *fieldName, int fieldType, void *fieldVal, int fieldLen) {
+int simv2_set_plot_options(void *e, const char *fieldName, int fieldType, void *fieldVal,
+                           int fieldLen)
+{
     return false;
 }
 
@@ -594,7 +641,9 @@ int simv2_set_plot_options(void *e, const char *fieldName, int fieldType, void *
 //
 // ****************************************************************************
 
-int simv2_set_operator_options(void *e, const char *fieldName, int fieldType, void *fieldVal, int fieldLen) {
+int simv2_set_operator_options(void *e, const char *fieldName, int fieldType, void *fieldVal,
+                               int fieldLen)
+{
     return false;
 }
 
@@ -622,13 +671,16 @@ int simv2_set_operator_options(void *e, const char *fieldName, int fieldType, vo
 //
 // ****************************************************************************
 
-int simv2_exportdatabase_with_options(void *e, const char *filename, const char *format, visit_handle names,
-                                      visit_handle options) {
+int simv2_exportdatabase_with_options(void *e, const char *filename, const char *format,
+                                      visit_handle names, visit_handle options)
+{
     return false;
 }
 
 // Left in for compatibility
-int simv2_exportdatabase(void *e, const char *filename, const char *format, visit_handle names, visit_handle options) {
+int simv2_exportdatabase(void *e, const char *filename, const char *format, visit_handle names,
+                         visit_handle options)
+{
     return simv2_exportdatabase_with_options(e, filename, format, names, VISIT_INVALID_HANDLE);
 }
 
@@ -653,7 +705,10 @@ int simv2_exportdatabase(void *e, const char *filename, const char *format, visi
 //
 // ****************************************************************************
 
-int simv2_restoresession(void *e, const char *filename) { return false; }
+int simv2_restoresession(void *e, const char *filename)
+{
+    return false;
+}
 
 // ****************************************************************************
 // Method: simv2_set_view2D
@@ -676,9 +731,15 @@ int simv2_restoresession(void *e, const char *filename) { return false; }
 //
 // ****************************************************************************
 
-int simv2_set_view2D(void *e, visit_handle v) { return false; }
+int simv2_set_view2D(void *e, visit_handle v)
+{
+    return false;
+}
 
-int simv2_get_view2D(void *e, visit_handle v) { return false; }
+int simv2_get_view2D(void *e, visit_handle v)
+{
+    return false;
+}
 
 // ****************************************************************************
 // Method: simv2_set_view3D
@@ -701,6 +762,12 @@ int simv2_get_view2D(void *e, visit_handle v) { return false; }
 //
 // ****************************************************************************
 
-int simv2_set_view3D(void *e, visit_handle v) { return false; }
+int simv2_set_view3D(void *e, visit_handle v)
+{
+    return false;
+}
 
-int simv2_get_view3D(void *e, visit_handle v) { return false; }
+int simv2_get_view3D(void *e, visit_handle v)
+{
+    return false;
+}

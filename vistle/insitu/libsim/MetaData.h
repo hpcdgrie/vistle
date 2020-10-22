@@ -21,9 +21,8 @@ enum class SimulationObjectType {
 
 };
 
-class MetaData
-{
-  public:
+class MetaData {
+public:
     bool timestepChanged() const;
     int simMode() const;
     size_t currentCycle() const;
@@ -40,7 +39,7 @@ class MetaData
     std::vector<std::vector<std::string>> getMeshAndFieldNames() const;
     const char *getName(const visit_handle &handle, SimulationObjectType type) const;
 
-  private:
+private:
     bool m_timestepChanged = false;
     int m_simMode = VISIT_SIMMODE_UNKNOWN;
     int m_currentCycle = 0;

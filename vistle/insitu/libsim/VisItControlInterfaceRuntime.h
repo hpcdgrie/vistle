@@ -45,7 +45,8 @@ V_VISITXPORT void simv2_time_step_changed(void *);
 V_VISITXPORT void simv2_execute_command(void *, const char *);
 V_VISITXPORT void simv2_disconnect();
 V_VISITXPORT void simv2_set_slave_process_callback(void (*)());
-V_VISITXPORT void simv2_set_command_callback(void *, void (*)(const char *, const char *, void *), void *);
+V_VISITXPORT void simv2_set_command_callback(void *, void (*)(const char *, const char *, void *),
+                                             void *);
 V_VISITXPORT int simv2_save_window(void *, const char *, int, int, int);
 V_VISITXPORT void simv2_debug_logs(int level, const char *msg);
 V_VISITXPORT int simv2_set_mpicomm(void *);
@@ -62,7 +63,8 @@ V_VISITXPORT int simv2_set_plot_options(void *, const char *, int, void *, int);
 V_VISITXPORT int simv2_set_operator_options(void *, const char *, int, void *, int);
 
 V_VISITXPORT int simv2_exportdatabase(void *, const char *, const char *, visit_handle);
-V_VISITXPORT int simv2_exportdatabase_with_options(void *, const char *, const char *, visit_handle, visit_handle);
+V_VISITXPORT int simv2_exportdatabase_with_options(void *, const char *, const char *, visit_handle,
+                                                   visit_handle);
 V_VISITXPORT int simv2_restoresession(void *, const char *);
 
 V_VISITXPORT int simv2_set_view2D(void *, visit_handle);

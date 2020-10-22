@@ -3,15 +3,21 @@
 using namespace vistle::insitu;
 using namespace vistle::insitu::message;
 
-void InSituTcp::initialize(std::shared_ptr<boost::asio::ip::tcp::socket> socket, boost::mpi::communicator comm) {
+void InSituTcp::initialize(std::shared_ptr<boost::asio::ip::tcp::socket> socket,
+                           boost::mpi::communicator comm)
+{
     m_socket = &(*socket);
     m_comm = comm;
     m_initialized = true;
 }
 
-bool InSituTcp::isInitialized() { return m_initialized; }
+bool InSituTcp::isInitialized()
+{
+    return m_initialized;
+}
 
-Message InSituTcp::recv() {
+Message InSituTcp::recv()
+{
     vistle::buffer payload;
     bool error = false;
 
@@ -23,7 +29,8 @@ Message InSituTcp::recv() {
             boost::system::error_code err;
             vistle::message::Buffer bf;
             vistle::message::recv(*m_socket, bf, err, true, &payload);
-            if (err || static_cast<vistle::message::Message &>(bf).type() != vistle::message::Type::INSITU) {
+            if (err || static_cast<vistle::message::Message &>(bf).type() !=
+                       vistle::message::Type::INSITU) {
                 type = static_cast<int>(InSituMessageType::ConnectionClosed);
                 ConnectionClosed proxy{false};
                 vistle::vecostreambuf<vistle::buffer> buf;

@@ -7,18 +7,17 @@ namespace insitu {
 namespace message {
 
 // Creates a serializable type which can be used as InsituMesaage
-template <typename Identifier, typename ValueType>
-struct SharedOption
-{
+template<typename Identifier, typename ValueType>
+struct SharedOption {
     SharedOption() = default;
-    SharedOption(const char *name)
-        : m_name(name) {}
+    SharedOption(const char *name): m_name(name) {}
 
-    SharedOption(const Identifier &name, ValueType initialValue = ValueType{}, std::function<void()> callback = nullptr)
-        : m_name(name)
-        , m_val(initialValue)
-        , m_callback(callback) {}
-    void setVal(ValueType val) const {
+    SharedOption(const Identifier &name, ValueType initialValue = ValueType{},
+                 std::function<void()> callback = nullptr)
+    : m_name(name), m_val(initialValue), m_callback(callback)
+    {}
+    void setVal(ValueType val) const
+    {
         m_val = val;
         if (m_callback) {
             m_callback();
@@ -28,8 +27,9 @@ struct SharedOption
 
     int value() const { return m_val; }
     ARCHIVE_ACCESS
-    template <class Archive>
-    void serialize(Archive &ar) {
+    template<class Archive>
+    void serialize(Archive &ar)
+    {
         ar &m_name;
         ar &m_val;
     }
@@ -37,14 +37,15 @@ struct SharedOption
     bool operator<(const SharedOption &other) const { return other.m_name < m_name; }
     bool operator>(const SharedOption &other) const { return other.m_name > m_name; }
 
-  private:
+private:
     Identifier m_name;
     mutable ValueType m_val = ValueType{};
     std::function<void()> m_callback = nullptr;
 };
 
-template <class Identifier, class ValueType, class Container>
-bool update(Container &container, const SharedOption<Identifier, ValueType> &newValue) {
+template<class Identifier, class ValueType, class Container>
+bool update(Container &container, const SharedOption<Identifier, ValueType> &newValue)
+{
     auto option = std::find(container.begin(), container.end(), newValue);
     if (option != container.end()) {
         option->setVal(newValue.value());

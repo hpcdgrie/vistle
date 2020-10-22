@@ -10,9 +10,8 @@ class MessageQueue;
 }
 namespace insitu {
 namespace message {
-class V_INSITUMESSAGEEXPORT AddObjectMsq
-{
-  public:
+class V_INSITUMESSAGEEXPORT AddObjectMsq {
+public:
     AddObjectMsq(const ModuleInfo &moduleInfo, size_t rank);
     ~AddObjectMsq();
     AddObjectMsq(AddObjectMsq &other) = delete;
@@ -22,9 +21,9 @@ class V_INSITUMESSAGEEXPORT AddObjectMsq
 
     void addObject(const std::string &port, vistle::Object::const_ptr obj);
 
-  private:
+private:
     vistle::message::MessageQueue *m_sendMessageQueue =
-        nullptr; // Queue to send addObject messages to LibSImController module
+    nullptr; // Queue to send addObject messages to LibSImController module
     ModuleInfo m_moduleInfo;
     size_t m_rank = 0;
 };

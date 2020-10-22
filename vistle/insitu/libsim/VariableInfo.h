@@ -11,10 +11,8 @@
 namespace vistle {
 namespace insitu {
 namespace libsim {
-struct VariableInfo
-{
-    VariableInfo(const MeshInfo &mesh)
-        : meshInfo(mesh){};
+struct VariableInfo {
+    VariableInfo(const MeshInfo &mesh): meshInfo(mesh){};
     const char *name = nullptr;
     vistle::DataBase::Mapping mapping = vistle::DataBase::Mapping::Unspecified;
     const MeshInfo &meshInfo;

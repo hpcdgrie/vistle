@@ -14,13 +14,14 @@
 #endif
 
 namespace insitu {
-class EngineInterface
-{
-  public:
-    static void V_ENGINEINTERFACEEXPORT setControllSocket(std::shared_ptr<boost::asio::ip::tcp::socket> socket);
-    static std::shared_ptr<boost::asio::ip::tcp::socket> V_ENGINEINTERFACEEXPORT getControllSocket();
+class EngineInterface {
+public:
+    static void V_ENGINEINTERFACEEXPORT
+    setControllSocket(std::shared_ptr<boost::asio::ip::tcp::socket> socket);
+    static std::shared_ptr<boost::asio::ip::tcp::socket>
+    V_ENGINEINTERFACEEXPORT getControllSocket();
 
-  private:
+private:
     static std::shared_ptr<boost::asio::ip::tcp::socket> m_socket;
 };
 

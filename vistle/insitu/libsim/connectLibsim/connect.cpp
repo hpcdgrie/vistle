@@ -12,8 +12,8 @@ using namespace vistle::insitu::libsim;
 static asio::io_service m_ioService;
 
 bool vistle::insitu::libsim::readSim2File(const std::string &path, std::string &hostname, int &port,
-                                          std::string &securityKey) {
-
+                                          std::string &securityKey)
+{
     std::ifstream f;
     f.open(path.c_str());
     if (!f.is_open()) {
@@ -43,9 +43,10 @@ bool vistle::insitu::libsim::readSim2File(const std::string &path, std::string &
     return true;
 }
 
-bool vistle::insitu::libsim::sendInitToSim(const std::vector<std::string> launchArgs, const std::string &host, int port,
-                                           const std::string &key) {
-
+bool vistle::insitu::libsim::sendInitToSim(const std::vector<std::string> launchArgs,
+                                           const std::string &host, int port,
+                                           const std::string &key)
+{
     //
     // Create a socket.
     //
@@ -57,14 +58,14 @@ bool vistle::insitu::libsim::sendInitToSim(const std::vector<std::string> launch
     s.reset(new boost::asio::ip::tcp::socket(m_ioService));
     asio::ip::tcp::resolver::iterator endpoint_iterator = resolver.resolve(query, ec);
     if (ec) {
-        std::cerr << "SendInitToSim failed to resolve query to host " << host << " on port " << port << ": "
-                  << ec.message() << std::endl;
+        std::cerr << "SendInitToSim failed to resolve query to host " << host << " on port " << port
+                  << ": " << ec.message() << std::endl;
         return false;
     }
     asio::connect(*s, endpoint_iterator, ec);
     if (ec) {
-        std::cerr << "SendInitToSim failed to connect socket to host " << host << " on port " << port << ": "
-                  << ec.message() << std::endl;
+        std::cerr << "SendInitToSim failed to connect socket to host " << host << " on port "
+                  << port << ": " << ec.message() << std::endl;
         return false;
     }
 
@@ -121,7 +122,9 @@ bool vistle::insitu::libsim::sendInitToSim(const std::vector<std::string> launch
     return true;
 }
 
-bool vistle::insitu::libsim::attemptLibSImConnection(const std::string &path, const std::vector<std::string> &args) {
+bool vistle::insitu::libsim::attemptLibSImConnection(const std::string &path,
+                                                     const std::vector<std::string> &args)
+{
     int port;
     std::string host, key;
     if (!vistle::insitu::libsim::readSim2File(path, host, port, key)) {

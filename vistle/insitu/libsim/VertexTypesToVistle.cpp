@@ -1,6 +1,7 @@
 #include "VertexTypesToVistle.h"
 
-vistle::UnstructuredGrid::Type vistle::insitu::libsim::vertexTypeToVistle(int type) {
+vistle::UnstructuredGrid::Type vistle::insitu::libsim::vertexTypeToVistle(int type)
+{
     static vistle::UnstructuredGrid::Type libsim_to_vistle[VISIT_NUM_CELL_TYPES];
     static bool init = false;
     if (!init) {
@@ -30,14 +31,17 @@ vistle::UnstructuredGrid::Type vistle::insitu::libsim::vertexTypeToVistle(int ty
         libsim_to_vistle[VISIT_CELL_TRIQUADRATIC_HEX] = vistle::UnstructuredGrid::Type::NONE;
         libsim_to_vistle[VISIT_CELL_QUADRATIC_LINEAR_QUAD] = vistle::UnstructuredGrid::Type::NONE;
         libsim_to_vistle[VISIT_CELL_QUADRATIC_LINEAR_WEDGE] = vistle::UnstructuredGrid::Type::NONE;
-        libsim_to_vistle[VISIT_CELL_BIQUADRATIC_QUADRATIC_WEDGE] = vistle::UnstructuredGrid::Type::NONE;
-        libsim_to_vistle[VISIT_CELL_BIQUADRATIC_QUADRATIC_HEX] = vistle::UnstructuredGrid::Type::NONE;
+        libsim_to_vistle[VISIT_CELL_BIQUADRATIC_QUADRATIC_WEDGE] =
+        vistle::UnstructuredGrid::Type::NONE;
+        libsim_to_vistle[VISIT_CELL_BIQUADRATIC_QUADRATIC_HEX] =
+        vistle::UnstructuredGrid::Type::NONE;
         init = true;
     }
     return libsim_to_vistle[type];
 }
 
-vistle::Index vistle::insitu::libsim::getNumVertices(vistle::UnstructuredGrid::Type type) {
+vistle::Index vistle::insitu::libsim::getNumVertices(vistle::UnstructuredGrid::Type type)
+{
     static vistle::Index num_verts_of_elem[vistle::UnstructuredGrid::Type::NUM_TYPES];
     static bool init = false;
     if (!init) {

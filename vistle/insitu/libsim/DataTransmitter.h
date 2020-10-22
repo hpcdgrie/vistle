@@ -17,24 +17,24 @@ namespace message {
 class SyncShmIDs;
 }
 namespace libsim {
-struct Rules
-{
+struct Rules {
     bool combineGrid = false;
     bool vtkFormat = false;
     bool constGrids = false;
     bool keepTimesteps = false;
 };
-class DataTransmitter
-{
-  public:
-    DataTransmitter(const MetaData &metaData, message::SyncShmIDs &creator, const message::ModuleInfo &moduleInfo,
-                    int rank);
-    void transferObjectsToVistle(size_t timestep, const message::ModuleInfo &connectedPorts, const Rules &rules);
+class DataTransmitter {
+public:
+    DataTransmitter(const MetaData &metaData, message::SyncShmIDs &creator,
+                    const message::ModuleInfo &moduleInfo, int rank);
+    void transferObjectsToVistle(size_t timestep, const message::ModuleInfo &connectedPorts,
+                                 const Rules &rules);
     void resetCache();
 
-  private:
-    typedef std::function<vistle::Object::ptr(const visit_handle &, vistle::insitu::message::SyncShmIDs &)>
-        GetMeshFunction;
+private:
+    typedef std::function<vistle::Object::ptr(const visit_handle &,
+                                              vistle::insitu::message::SyncShmIDs &)>
+    GetMeshFunction;
 
     std::set<std::string> getRequestedObjets(const message::ModuleInfo &connectedPorts);
     void sendMeshesToModule(const std::set<std::string> &objects);
@@ -49,7 +49,8 @@ class DataTransmitter
     void makeCombinedMesh(MeshInfo &meshInfo);
     void makeSubMesh(int domain, MeshInfo &meshInfo, GetMeshFunction getter);
 
-    void addBlockToMeshInfo(vistle::Object::ptr grid, MeshInfo &meshInfo, visit_handle meshHandle = visit_handle{});
+    void addBlockToMeshInfo(vistle::Object::ptr grid, MeshInfo &meshInfo,
+                            visit_handle meshHandle = visit_handle{});
     void sendMeshToModule(const MeshInfo &meshInfo);
 
     void sendVarablesToModule(const std::set<std::string> &objects);
@@ -70,7 +71,8 @@ class DataTransmitter
 
     size_t m_currTimestep = 0;
     Rules m_rules;
-    std::map<std::string, MeshInfo> m_meshes; // used to find the coresponding mesh for the variables
+    std::map<std::string, MeshInfo>
+    m_meshes; // used to find the coresponding mesh for the variables
 };
 
 } // namespace libsim

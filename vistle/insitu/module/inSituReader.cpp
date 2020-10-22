@@ -10,15 +10,20 @@ using std::endl;
 
 size_t InSituReader::m_numInstances = 0;
 
-InSituReader::InSituReader(const std::string &description, const std::string &name, const int moduleID,
-                           mpi::communicator comm)
-    : Module(description, name, moduleID, comm) {
+InSituReader::InSituReader(const std::string &description, const std::string &name,
+                           const int moduleID, mpi::communicator comm)
+: Module(description, name, moduleID, comm)
+{
     setReducePolicy(vistle::message::ReducePolicy::OverAll);
 }
 
-bool InSituReader::isExecuting() { return m_isExecuting; }
+bool InSituReader::isExecuting()
+{
+    return m_isExecuting;
+}
 
-bool InSituReader::handleExecute(const vistle::message::Execute *exec) {
+bool InSituReader::handleExecute(const vistle::message::Execute *exec)
+{
     using namespace vistle::message;
 
     if (m_executionCount < exec->getExecutionCount()) {
@@ -34,7 +39,8 @@ bool InSituReader::handleExecute(const vistle::message::Execute *exec) {
     busy.setDestId(Id::LocalManager);
     sendMessage(busy);
 #endif
-    if (!m_isExecuting && (exec->what() == Execute::ComputeExecute || exec->what() == Execute::Prepare)) {
+    if (!m_isExecuting &&
+        (exec->what() == Execute::ComputeExecute || exec->what() == Execute::Prepare)) {
         applyDelayedChanges();
         ret &= prepareWrapper(exec);
         if (ret) {
@@ -53,9 +59,13 @@ bool InSituReader::handleExecute(const vistle::message::Execute *exec) {
     return ret;
 }
 
-bool InSituReader::operate() { return false; }
+bool InSituReader::operate()
+{
+    return false;
+}
 
-bool InSituReader::dispatch(bool block, bool *messageReceived) {
+bool InSituReader::dispatch(bool block, bool *messageReceived)
+{
     bool passMsg = false;
     bool msgRecv = false;
     vistle::message::Buffer buf;
@@ -73,8 +83,8 @@ bool InSituReader::dispatch(bool block, bool *messageReceived) {
     return retval;
 }
 
-bool InSituReader::prepare() {
-
+bool InSituReader::prepare()
+{
     try {
         m_shmIDs.set(vistle::Shm::the().objectID(), vistle::Shm::the().arrayID());
     } catch (const vistle::exception &ex) {
@@ -88,9 +98,9 @@ bool InSituReader::prepare() {
     return true;
 }
 
-void InSituReader::cancelExecuteMessageReceived(const vistle::message::Message *msg) {
+void InSituReader::cancelExecuteMessageReceived(const vistle::message::Message *msg)
+{
     if (m_isExecuting) {
-
         vistle::Shm::the().setArrayID(m_shmIDs.arrayID());
         vistle::Shm::the().setObjectID(m_shmIDs.objectID());
         if (!endExecute()) {
@@ -102,17 +112,23 @@ void InSituReader::cancelExecuteMessageReceived(const vistle::message::Message *
     }
 }
 
-size_t InSituReader::instanceNum() const { return m_instanceNum; }
+size_t InSituReader::instanceNum() const
+{
+    return m_instanceNum;
+}
 
-void insitu::InSituReader::reconnect() {
+void insitu::InSituReader::reconnect()
+{
     initRecvFromSimQueue();
     m_shmIDs.close();
-    m_shmIDs.initialize(id(), rank(), std::to_string(m_numInstances), insitu::message::SyncShmIDs::Mode::Create);
+    m_shmIDs.initialize(id(), rank(), std::to_string(m_numInstances),
+                        insitu::message::SyncShmIDs::Mode::Create);
     m_instanceNum = m_numInstances;
     ++m_numInstances;
 }
 
-vistle::insitu::message::ModuleInfo::ShmInfo insitu::InSituReader::gatherModuleInfo() {
+vistle::insitu::message::ModuleInfo::ShmInfo insitu::InSituReader::gatherModuleInfo()
+{
     message::ModuleInfo::ShmInfo shmInfo;
     shmInfo.hostname = vistle::hostname();
     shmInfo.id = id();
@@ -125,25 +141,28 @@ vistle::insitu::message::ModuleInfo::ShmInfo insitu::InSituReader::gatherModuleI
     return shmInfo;
 }
 
-bool vistle::insitu::InSituReader::sendMessage(const vistle::message::Message &message, const buffer *payload) const {
+bool vistle::insitu::InSituReader::sendMessage(const vistle::message::Message &message,
+                                               const buffer *payload) const
+{
     if (payload && m_isExecuting) {
-        CERR
-            << "InSituReader: can't send message with payload while executing because that would create a vistle-object"
-            << endl;
+        CERR << "InSituReader: can't send message with payload while executing because that would "
+                "create a vistle-object"
+             << endl;
         return false;
     }
     return Module::sendMessage(message, payload);
 }
 
-void InSituReader::initRecvFromSimQueue() {
+void InSituReader::initRecvFromSimQueue()
+{
     std::string msqName = vistle::message::MessageQueue::createName(
-        ("recvFromSim" + std::to_string(m_numInstances)).c_str(), id(), rank());
+    ("recvFromSim" + std::to_string(m_numInstances)).c_str(), id(), rank());
 
     try {
         m_receiveFromSimMessageQueue.reset(vistle::message::MessageQueue::create(msqName));
         CERR << "receiveFromSimMessageQueue name = " << msqName << std::endl;
     } catch (boost::interprocess::interprocess_exception &ex) {
-        throw vistle::exception(std::string("opening recv from sim message queue with name ") + msqName + ": " +
-                                ex.what());
+        throw vistle::exception(std::string("opening recv from sim message queue with name ") +
+                                msqName + ": " + ex.what());
     }
 }

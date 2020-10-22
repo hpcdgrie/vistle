@@ -4,8 +4,7 @@
 namespace vistle {
 namespace insitu {
 namespace sensei {
-struct Exeption : public InsituExeption
-{
+struct Exeption: public InsituExeption {
     Exeption() { *this << "VistleSensei: "; };
 };
 } // namespace sensei

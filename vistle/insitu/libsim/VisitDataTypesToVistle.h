@@ -11,7 +11,8 @@
 namespace vistle {
 namespace insitu {
 namespace libsim {
-constexpr DataType dataTypeToVistle(int dataType) {
+constexpr DataType dataTypeToVistle(int dataType)
+{
     switch (dataType) {
     case VISIT_DATATYPE_CHAR:
         return DataType::CHAR;
@@ -33,7 +34,8 @@ constexpr DataType dataTypeToVistle(int dataType) {
         break;
     }
 }
-constexpr vistle::DataBase::Mapping mappingToVistle(int mapping) {
+constexpr vistle::DataBase::Mapping mappingToVistle(int mapping)
+{
     switch (mapping) {
     case VISIT_VARCENTERING_NODE:
         return vistle::DataBase::Vertex;
@@ -47,7 +49,8 @@ constexpr vistle::DataBase::Mapping mappingToVistle(int mapping) {
     }
 }
 
-constexpr vistle::Object::Type objTypeToVistle(int objType) {
+constexpr vistle::Object::Type objTypeToVistle(int objType)
+{
     switch (objType) {
     case VISIT_MESHTYPE_RECTILINEAR:
         return vistle::Object::Type::RECTILINEARGRID;
