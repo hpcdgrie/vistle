@@ -33,6 +33,7 @@ set(util_HEADERS
     export.h
     fileio.h
     findself.h
+    functiontraits.h
     hostname.h
     listenv4v6.h
     math.h
