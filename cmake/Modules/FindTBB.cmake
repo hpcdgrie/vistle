@@ -14,6 +14,12 @@
 ## limitations under the License.                                           ##
 ## ======================================================================== ##
 
+#if exists prefare a TBBConfig.cmake
+vistle_find_package(TBB CONFIG NO_MODULE)
+if(${TBB_FOUND})
+    return()    
+endif()
+
 find_path(
     TBB_ROOT include/tbb/task_group.h
     DOC "Root of TBB installation"
@@ -200,6 +206,15 @@ else()
     mark_as_advanced(TBB_LIBRARY)
     mark_as_advanced(TBB_LIBRARY_MALLOC)
 
+endif()
+
+if(${TBB_FOUND})
+    add_library(TBB::tbb SHARED IMPORTED)
+    set_target_properties(TBB::tbb PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${TBB_INCLUDE_DIRS}"
+        INTERFACE_LINK_LIBRARIES "${TBB_LIBRARIES}"
+        IMPORTED_LOCATION "${TBB_LIBRARY}"
+        )
 endif()
 
 ##############################################################

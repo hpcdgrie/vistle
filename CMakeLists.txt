@@ -253,17 +253,7 @@ if(NOT VISTLE_GUI_ONLY)
     set(ICET_CORE_LIBS "IceTCore")
     set(ICET_MPI_LIBS "IceTMPI")
     set(ICET_FOUND TRUE)
-    vistle_find_package(TBB CONFIG NO_MODULE)
-    if(NOT ${TBB_FOUND})
-        vistle_find_package(TBB)
-        if(${TBB_FOUND})
-            add_library(TBB::tbb SHARED IMPORTED)
-            set_target_properties(TBB::tbb PROPERTIES
-                INTERFACE_INCLUDE_DIRECTORIES "${TBB_INCLUDE_DIRS}"
-                INTERFACE_LINK_LIBRARIES "${TBB_LIBRARIES}")
-            
-        endif()
-    endif()
+    vistle_find_package(TBB)
 
 endif(NOT VISTLE_GUI_ONLY)
 
