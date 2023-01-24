@@ -2,8 +2,6 @@
 #include <vistle/core/points.h>
 #include <vistle/core/unstr.h>
 #include <boost/filesystem.hpp>
-#include <shlobj_core.h>
-
 
 using namespace vistle;
 
