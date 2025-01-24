@@ -37,9 +37,6 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "CrayLinuxEnvironment")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -craympich-mt")
 endif()
 
-add_custom_target(vistle_doc)
-add_custom_target(vistle_doc_skip)
-
 if(POLICY CMP0042)
     # default to finding shlibs relative to @rpath on MacOS
     cmake_policy(SET CMP0042 NEW)
@@ -542,6 +539,7 @@ vistle_find_package(
     OPTIONAL_COMPONENTS
     ${BOOST_OPT})
 
+
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-command-line-argument")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-command-line-argument")
@@ -899,8 +897,8 @@ macro(USE_OPENMP)
             endif()
         endif()
     else()
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unknown-pragmas")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unknown-pragmas")
+        # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unknown-pragmas")
+        # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unknown-pragmas")
     endif()
 endmacro(USE_OPENMP)
 
@@ -919,9 +917,11 @@ set(ALL_MODULES
 set(MODULE_DESCRIPTION_FILE ${PROJECT_BINARY_DIR}/share/vistle/moduledescriptions.txt)
 
 set(VISTLE_DOC_SKIP FALSE)
+include(cmake/Documentation.cmake)
 if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Emscripten")
     file(REMOVE ${MODULE_DESCRIPTION_FILE})
     install(FILES ${MODULE_DESCRIPTION_FILE} DESTINATION ${CMAKE_INSTALL_PREFIX}/share/vistle/)
+
 
     macro(add_module2 targetname executable description)
         if(NOT VISTLE_MODULE_CATEGORY)
@@ -979,7 +979,7 @@ if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Emscripten")
                 set(SKIP_4_DOC TRUE)
             endif()
         endforeach()
-        if(NOT SKIP_4_DOC)
+        if(NOT SKIP_4_DOC AND VISTLE_BUILD_DOC)
             add_module_doc_target(${targetname} ${VISTLE_DOC_SKIP})
         endif()
     endmacro(add_module2)
@@ -992,7 +992,7 @@ if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Emscripten")
         endif()
     endmacro(add_module)
 
-    include(cmake/Documentation.cmake)
+
 
     macro(add_vtkm_module targetname description)
         set(SOURCES "${ARGN}")

@@ -1,3 +1,29 @@
+
+vistle_find_package(Sphinx)
+if(SPHINX_EXECUTABLE)
+
+    add_custom_target(vistle_module_doc)
+    add_custom_target(vistle_doc)
+    add_custom_target(vistle_doc_skip)
+
+add_custom_command(
+    TARGET vistle_doc
+    COMMAND ${SPHINX_EXECUTABLE} -M html source build
+    WORKING_DIRECTORY  ${PROJECT_SOURCE_DIR}/docs
+    COMMENT "Building readTheDocs documentation"
+    DEPENDS vistle_module_doc)
+
+    set(VISTLE_BUILD_DOC TRUE)
+else()
+    message("Sphinx not found, documentation can not be built")
+    set(VISTLE_BUILD_DOC FALSE)
+    return()
+endif()
+
+if(${VISTLE_BUILD_DOC})
+    message("VISTLE_BUILD_DOC: ${VISTLE_BUILD_DOC}")
+endif()
+
 macro(add_module_doc_target targetname)
 
     set(VISTLE_DOCUMENTATION_WORKFLOW ${PROJECT_SOURCE_DIR}/doc/generateModuleInfo.vsl)
@@ -25,7 +51,7 @@ macro(add_module_doc_target targetname)
         message("Skipping ${targetname}_doc: ${VISTLE_DOC_SKIP}")
         add_dependencies(vistle_doc_skip ${targetname}_doc)
     else()
-        add_dependencies(vistle_doc ${targetname}_doc)
+        add_dependencies(vistle_module_doc ${targetname}_doc)
     endif()
 
     file(
