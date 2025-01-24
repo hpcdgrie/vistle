@@ -1,6 +1,6 @@
 [headline]:<>
 ## Purpose
-This module is used to connect to a simulation via the SENSEI in-situ interface.
+This module is used to connect to a simulation via the Catalyst II or the SENSEI in-situ interface.
 
 
 ## Data Preparation
@@ -17,6 +17,10 @@ by specifing:
 
 ``` 
 in the xml file that is passed to the SENSEI ConfigurableAnalysisAdaptor. Via the options tag additional command line parameters can be passed to vistle. 
+
+When Vistle is build with [Catalst](https://gitlab.kitware.com/paraview/catalyst) it builds a
+libcatalyst-vistle.so library under yourVistleBuildDirectory/lib/catalyst/. If a Catalyst instrumented simulation is configured to 
+link to this library the simulation data can be injected in the Vistle pipeline using this module. 
 
 ## Ports
 
