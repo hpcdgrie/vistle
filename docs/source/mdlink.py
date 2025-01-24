@@ -51,6 +51,12 @@ def pathExists(path) -> bool:
     return check(os.path.exists, path)
 
 
+def getRelPath(root, root_link_output_path):
+        md_root = os.path.relpath(root, root_link_output_path)
+        if sys.platform == 'win32':
+            md_root = md_root.replace('\\', '/')
+        return md_root
+
 def createLinks(markdown_list, root_link_output_path):
     if not pathExists(root_link_output_path):
         print("Directory {} does not exist.".format(root_link_output_path))
@@ -58,7 +64,7 @@ def createLinks(markdown_list, root_link_output_path):
     return [
         createLinkToMarkdownFile(
             root_link_output_path,
-            os.path.relpath(root, root_link_output_path),
+            getRelPath(root, root_link_output_path),
             filename,
         )
         for root, filename in markdown_list
