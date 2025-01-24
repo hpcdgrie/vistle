@@ -3,14 +3,20 @@
 Module for creating symbolic links to markdown files with myst-parser
 """
 
-import os
 import argparse
+import os
+import sys
 from collections import namedtuple
 from clear import deleteFilesInDir
 
+
+if sys.platform == 'win32':
+    BASE_DIR = os.path.dirname(os.path.realpath(__file__)).replace('\\', '/')
+else:
+    BASE_DIR = os.path.dirname(os.path.realpath(__file__))
+
 Markdown = namedtuple("Markdown", "root filename")
 
-BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 INDENT = "   {}\n"
 MD_EXTENSION = ".md"
 LINK_STR = "_link"
