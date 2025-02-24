@@ -42,6 +42,8 @@ function(configure_documentation)
     # List to hold all the output files
     set(CONFIGURED_FILES)
     # Configure each file and add to the list of output files
+    set(CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env ALL_VISTLE_MODULES="${ALL_MODULES}" ALL_VISTLE_MODULES_CATEGORY="${ALL_VISTLE_MODULES_CATEGORY}" python
+                          ${CMAKE_SOURCE_DIR}/doc/tools/insertModuleLinks.py ${VISTLE_DOCUMENTATION_SOURCE_DIR})
     foreach(DOCUMENTATION_FILE ${DOCUMENTATION_FILES})
         set(INPUT_FILE ${SOURCE_DIR}/${DOCUMENTATION_FILE})
         set(OUTPUT_FILE ${VISTLE_DOCUMENTATION_SOURCE_DIR}/${DOCUMENTATION_FILE})
@@ -51,8 +53,7 @@ function(configure_documentation)
 
             add_custom_command(
                 OUTPUT ${OUTPUT_FILE} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E env ALL_VISTLE_MODULES="${ALL_MODULES}" ALL_VISTLE_MODULES_CATEGORY="${ALL_VISTLE_MODULES_CATEGORY}" python
-                        ${CMAKE_SOURCE_DIR}/doc/tools/insertModuleLinks.py ${INPUT_FILE} ${OUTPUT_FILE} ${VISTLE_DOCUMENTATION_SOURCE_DIR}
+                COMMAND ${CONFIGURE_COMMAND} ${INPUT_FILE} ${OUTPUT_FILE}
                 DEPENDS ${INPUT_FILE} vistle_module_doc ${CMAKE_SOURCE_DIR}/doc/tools/insertModuleLinks.py
                 COMMENT "Configuring file: ${OUTPUT_FILE}")
         else()
@@ -65,6 +66,35 @@ function(configure_documentation)
     endforeach()
     add_custom_target(configure_documentation_files ALL DEPENDS ${CONFIGURED_FILES})
     add_dependencies(vistle_doc configure_documentation_files)
+    #configure links to other modules in the module generated markdowns
+    set(CONFIGURED_MODULE_FILES)
+    #get all directories under ${CMAKE_BINARY_DIR}/docs/source/modules/
+    file(
+        GLOB ALL_VISTLE_MODULES_CATEGORIES
+        RELATIVE ${CMAKE_BINARY_DIR}/docs/source/modules
+        ${CMAKE_BINARY_DIR}/docs/source/modules/*)
+    foreach(CATEGORY_DIR ${ALL_VISTLE_MODULES_CATEGORIES})
+        file(
+            GLOB_RECURSE MODULE_MARKDOWNS
+            RELATIVE ${CMAKE_BINARY_DIR}/docs/source/modules/${CATEGORY_DIR}
+            "${CMAKE_BINARY_DIR}/docs/source/modules/${CATEGORY_DIR}/*.md")
+        message("modules in category: ${CATEGORY_DIR} ${MODULE_MARKDOWNS}")
+        foreach(MODULE_MARKDOWN ${MODULE_MARKDOWNS})
+            set(INPUT_FILE ${CMAKE_BINARY_DIR}/docs/source/modules/${CATEGORY_DIR}/${MODULE_MARKDOWN})
+            set(OUTPUT_FILE ${VISTLE_DOCUMENTATION_SOURCE_DIR}/modules/${CATEGORY_DIR}/${MODULE_MARKDOWN})
+            list(APPEND CONFIGURED_MODULE_FILES ${OUTPUT_FILE})
+            add_custom_command(
+                OUTPUT ${OUTPUT_FILE} POST_BUILD
+                COMMAND ${CONFIGURE_COMMAND} ${INPUT_FILE} ${OUTPUT_FILE}
+                DEPENDS ${INPUT_FILE} vistle_module_doc ${CMAKE_SOURCE_DIR}/doc/tools/insertModuleLinks.py
+                COMMENT "Configuring module file: ${OUTPUT_FILE}")
+        endforeach()
+
+    endforeach()
+    add_custom_target(configure_module_files ALL DEPENDS ${CONFIGURED_MODULE_FILES})
+    add_dependencies(vistle_doc configure_module_files)
+    message("Configured documentation files: ${CONFIGURED_MODULE_FILES}")
+
 endfunction()
 
 set(VISTLE_DOCUMENTATION_DIR
@@ -118,11 +148,12 @@ macro(add_module_doc_target targetname)
         CACHE INTERNAL "")
 
     set(VISTLE_DOCUMENTATION_WORKFLOW ${PROJECT_SOURCE_DIR}/doc/tools/generateModuleInfo.vsl)
+    #insert module paramerts in markdown files
     set(DOC_COMMAND
-        ${CMAKE_COMMAND} -E env VISTLE_DOCUMENTATION_TARGET=${targetname} VISTLE_DOCUMENTATION_DIR=${VISTLE_DOCUMENTATION_DIR}
+        ${CMAKE_COMMAND} -E env VISTLE_DOCUMENTATION_TARGET=${targetname} VISTLE_DOCUMENTATION_DIR=${CMAKE_BINARY_DIR}
         VISTLE_MODULE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} VISTLE_DOCUMENTATION_CATEGORY=${CATEGORY} vistle --batch ${VISTLE_DOCUMENTATION_WORKFLOW})
 
-    set(OUTPUT_FILE ${VISTLE_DOCUMENTATION_SOURCE_DIR}/modules/${CATEGORY}/${targetname}.md)
+    set(OUTPUT_FILE ${CMAKE_BINARY_DIR}/docs/source/modules/${CATEGORY}/${targetname}.md)
     set(INPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/${targetname}.md)
     if(NOT EXISTS ${INPUT_FILE})
         set(INPUT_FILE)

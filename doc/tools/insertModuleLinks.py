@@ -2,11 +2,11 @@ import sys
 import os
 
 # Only handle .md files
-if not sys.argv[1].endswith(".md"):
+if not sys.argv[2].endswith(".md"):
     sys.exit(1)
 
 # Open the input file for reading
-input_file_path = sys.argv[1]
+input_file_path = sys.argv[2]
 try:
     input_file = open(input_file_path, "r")
 except IOError as e:
@@ -14,7 +14,7 @@ except IOError as e:
     sys.exit(1)
 
 # Create output directory if it does not exist
-output_file_path = sys.argv[2]
+output_file_path = sys.argv[3]
 output_dir = os.path.dirname(output_file_path)
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
@@ -32,7 +32,7 @@ categories = os.environ.get('ALL_VISTLE_MODULES_CATEGORY', '').split(" ")
 
 # Get the relative path from input file to vistle/module directory
 this_directory = os.path.dirname(os.path.realpath(__file__))
-doc_source_dir = sys.argv[3]
+doc_source_dir = sys.argv[1]
 relative_path = os.path.relpath(doc_source_dir, os.path.dirname(output_file_path))
 
 # Search input for occurrences of moduleName.md

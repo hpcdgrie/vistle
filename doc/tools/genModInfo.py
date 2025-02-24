@@ -264,11 +264,11 @@ def findTag(line, tags):
 
 
 def generateModuleDescriptions() -> None:
-    # print("DOCUMENTATION_DEST_ROOT: " + DOCUMENTATION_DEST_ROOT)
-    # print("MODULE_SOURCE_DIR: " + MODULE_SOURCE_DIR)
-    # print("MODULE_NAME: " + MODULE_NAME)
-    # print("MODULE_CATEGORY: " + MODULE_CATEGORY)
-    # print("DESTDIR: " + DESTDIR)
+    print("DOCUMENTATION_DEST_ROOT: " + DOCUMENTATION_DEST_ROOT)
+    print("MODULE_SOURCE_DIR: " + MODULE_SOURCE_DIR)
+    print("MODULE_NAME: " + MODULE_NAME)
+    print("MODULE_CATEGORY: " + MODULE_CATEGORY)
+    print("DESTDIR: " + DESTDIR)
     
     
     filename = MODULE_SOURCE_DIR + "/" + MODULE_NAME + ".md"
