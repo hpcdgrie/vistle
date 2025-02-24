@@ -32,6 +32,7 @@ def deleteFilesInDir(path, exclude=[], pattern='*'):
     exclude -- list of files
     pattern -- regex pattern
     """
+    print("deleteFilesInDir " + path)
     for file in Path(path).glob(pattern):
         if not any(Path(file).name == eF for eF in exclude):
             try:

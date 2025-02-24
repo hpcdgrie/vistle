@@ -1,3 +1,3 @@
-```{include} ../../../app/gui/icons/README.md
+```{include} ../../readme/app/gui/icons/README.md
 :relative-images:
 ```

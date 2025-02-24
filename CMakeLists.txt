@@ -1174,3 +1174,6 @@ add_subdirectory(bin)
 
 include(FeatureSummary)
 feature_summary(WHAT ALL)
+if(VISTLE_BUILD_DOC)
+    configure_documentation()
+endif()

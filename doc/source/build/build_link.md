@@ -1,3 +1,3 @@
-```{include} ../../../README.md
+```{include} ../../readme/README.md
 :relative-images:
 ```

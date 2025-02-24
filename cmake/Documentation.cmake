@@ -1,3 +1,72 @@
+set(ALL_VISTLE_MODULES
+    ""
+    CACHE INTERNAL "")
+set(ALL_VISTLE_MODULES_CATEGORY
+    ""
+    CACHE INTERNAL "")
+
+function(copy_readme)
+
+    # Find all README.md files recursively
+    file(
+        GLOB_RECURSE README_FILES
+        RELATIVE ${CMAKE_SOURCE_DIR}
+        "README.md" "*/README.md")
+    set(README_OUTPUT_FILES)
+    # Custom command to copy README.md files during the build process
+    foreach(README_FILE ${README_FILES})
+        get_filename_component(README_DIR ${README_FILE} DIRECTORY)
+        set(OUTPUT_FILE ${VISTLE_DOCUMENTATION_DIR}/docs/readme/${README_FILE})
+        list(APPEND README_OUTPUT_FILES ${OUTPUT_FILE})
+        add_custom_command(
+            OUTPUT ${OUTPUT_FILE}
+            DEPENDS ${CMAKE_SOURCE_DIR}/${README_FILE} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/${README_FILE} ${OUTPUT_FILE}
+            COMMENT "Copying ${README_FILE} to ${OUTPUT_FILE}")
+    endforeach()
+
+    # Custom target to copy all README.md files
+    add_custom_target(copy_readme_files ALL DEPENDS ${README_OUTPUT_FILES})
+    add_dependencies(vistle_doc copy_readme_files)
+endfunction()
+
+function(configure_documentation)
+
+    # Find all files in the ToInstall directory recursively
+
+    set(SOURCE_DIR ${CMAKE_SOURCE_DIR}/doc/source)
+    file(
+        GLOB_RECURSE DOCUMENTATION_FILES
+        RELATIVE ${SOURCE_DIR}
+        "${SOURCE_DIR}/*")
+    # List to hold all the output files
+    set(CONFIGURED_FILES)
+    # Configure each file and add to the list of output files
+    foreach(DOCUMENTATION_FILE ${DOCUMENTATION_FILES})
+        set(INPUT_FILE ${SOURCE_DIR}/${DOCUMENTATION_FILE})
+        set(OUTPUT_FILE ${VISTLE_DOCUMENTATION_SOURCE_DIR}/${DOCUMENTATION_FILE})
+        list(APPEND CONFIGURED_FILES ${OUTPUT_FILE})
+
+        if(${DOCUMENTATION_FILE} MATCHES ".*\\.md")
+
+            add_custom_command(
+                OUTPUT ${OUTPUT_FILE} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E env ALL_VISTLE_MODULES="${ALL_MODULES}" ALL_VISTLE_MODULES_CATEGORY="${ALL_VISTLE_MODULES_CATEGORY}" python
+                        ${CMAKE_SOURCE_DIR}/doc/tools/insertModuleLinks.py ${INPUT_FILE} ${OUTPUT_FILE} ${VISTLE_DOCUMENTATION_SOURCE_DIR}
+                DEPENDS ${INPUT_FILE} vistle_module_doc ${CMAKE_SOURCE_DIR}/doc/tools/insertModuleLinks.py
+                COMMENT "Configuring file: ${OUTPUT_FILE}")
+        else()
+            add_custom_command(
+                OUTPUT ${OUTPUT_FILE} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy ${INPUT_FILE} ${OUTPUT_FILE}
+                DEPENDS ${INPUT_FILE})
+        endif()
+
+    endforeach()
+    add_custom_target(configure_documentation_files ALL DEPENDS ${CONFIGURED_FILES})
+    add_dependencies(vistle_doc configure_documentation_files)
+endfunction()
+
 set(VISTLE_DOCUMENTATION_DIR
     "${PROJECT_SOURCE_DIR}"
     CACHE PATH "Path where the documentation will be build")
@@ -9,16 +78,19 @@ if(SPHINX_EXECUTABLE)
     add_dependencies(vistle_doc vistle_module_doc)
 
     set(READTHEDOCS_SOURCE_DIR ${CMAKE_SOURCE_DIR}/doc/readthedocs)
+    set(VISTLE_DOCUMENTATION_SOURCE_DIR ${VISTLE_DOCUMENTATION_DIR}/docs/source)
 
+    #copy the readthedocs configuration scripts
     add_custom_command(
         TARGET vistle_doc
         POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${READTHEDOCS_SOURCE_DIR} ${VISTLE_DOCUMENTATION_DIR}/docs/source)
+        COMMAND ${CMAKE_COMMAND} -E copy ${READTHEDOCS_SOURCE_DIR}/clear.py ${VISTLE_DOCUMENTATION_SOURCE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy ${READTHEDOCS_SOURCE_DIR}/conf.py ${VISTLE_DOCUMENTATION_SOURCE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy ${READTHEDOCS_SOURCE_DIR}/mdlink.py ${VISTLE_DOCUMENTATION_SOURCE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy ${READTHEDOCS_SOURCE_DIR}/requirements.txt ${VISTLE_DOCUMENTATION_DIR}/docs
+        COMMAND ${CMAKE_COMMAND} -E copy ${READTHEDOCS_SOURCE_DIR}/.readthedocs.yaml ${VISTLE_DOCUMENTATION_DIR})
 
-    add_custom_command(
-        TARGET vistle_doc
-        POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/doc/source ${VISTLE_DOCUMENTATION_DIR}/docs/source)
+    copy_readme()
 
     add_custom_command(
         TARGET vistle_doc
@@ -38,13 +110,19 @@ macro(add_module_doc_target targetname)
 
     get_filename_component(PARENT_DIR ${CMAKE_CURRENT_LIST_DIR} DIRECTORY)
     get_filename_component(CATEGORY ${PARENT_DIR} NAME)
+    set(ALL_VISTLE_MODULES
+        ${ALL_VISTLE_MODULES} ${targetname}
+        CACHE INTERNAL "")
+    set(ALL_VISTLE_MODULES_CATEGORY
+        ${ALL_VISTLE_MODULES_CATEGORY} ${CATEGORY}
+        CACHE INTERNAL "")
 
     set(VISTLE_DOCUMENTATION_WORKFLOW ${PROJECT_SOURCE_DIR}/doc/tools/generateModuleInfo.vsl)
     set(DOC_COMMAND
         ${CMAKE_COMMAND} -E env VISTLE_DOCUMENTATION_TARGET=${targetname} VISTLE_DOCUMENTATION_DIR=${VISTLE_DOCUMENTATION_DIR}
         VISTLE_MODULE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} VISTLE_DOCUMENTATION_CATEGORY=${CATEGORY} vistle --batch ${VISTLE_DOCUMENTATION_WORKFLOW})
 
-    set(OUTPUT_FILE ${VISTLE_DOCUMENTATION_DIR}/docs/source/modules/${CATEGORY}/${targetname}.md)
+    set(OUTPUT_FILE ${VISTLE_DOCUMENTATION_SOURCE_DIR}/modules/${CATEGORY}/${targetname}.md)
     set(INPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/${targetname}.md)
     if(NOT EXISTS ${INPUT_FILE})
         set(INPUT_FILE)

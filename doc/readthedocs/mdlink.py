@@ -159,7 +159,7 @@ def run(
         ]
         return
 
-    deleteFilesInDir(root_link_output_path, pattern="*.md")
+    # deleteFilesInDir(root_link_output_path, pattern="*.md")
     index_link_list = createLinks(markdown_files, root_link_output_path)
     _ = [
         addLinkToRSTFile(file_link_output_path, link)
