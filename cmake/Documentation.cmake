@@ -26,7 +26,7 @@ function(copy_readme)
     endforeach()
 
     # Custom target to copy all README.md files
-    add_custom_target(copy_readme_files ALL DEPENDS ${README_OUTPUT_FILES})
+    add_custom_target(copy_readme_files DEPENDS ${README_OUTPUT_FILES})
     add_dependencies(vistle_doc copy_readme_files)
 endfunction()
 
@@ -43,7 +43,7 @@ function(configure_documentation)
     set(CONFIGURED_FILES)
     # Configure each file and add to the list of output files
     set(CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env ALL_VISTLE_MODULES="${ALL_MODULES}" ALL_VISTLE_MODULES_CATEGORY="${ALL_VISTLE_MODULES_CATEGORY}" python
-                          ${CMAKE_SOURCE_DIR}/doc/tools/insertModuleLinks.py ${VISTLE_DOCUMENTATION_SOURCE_DIR})
+                          ${CMAKE_SOURCE_DIR}/doc/tools/insertModuleLinks.py ${PROJECT_SOURCE_DIR} ${VISTLE_DOCUMENTATION_SOURCE_DIR})
     foreach(DOCUMENTATION_FILE ${DOCUMENTATION_FILES})
         set(INPUT_FILE ${SOURCE_DIR}/${DOCUMENTATION_FILE})
         set(OUTPUT_FILE ${VISTLE_DOCUMENTATION_SOURCE_DIR}/${DOCUMENTATION_FILE})
@@ -64,7 +64,7 @@ function(configure_documentation)
         endif()
 
     endforeach()
-    add_custom_target(configure_documentation_files ALL DEPENDS ${CONFIGURED_FILES})
+    add_custom_target(configure_documentation_files DEPENDS ${CONFIGURED_FILES})
     add_dependencies(vistle_doc configure_documentation_files)
     #configure links to other modules in the module generated markdowns
     set(CONFIGURED_MODULE_FILES)
@@ -91,7 +91,7 @@ function(configure_documentation)
         endforeach()
 
     endforeach()
-    add_custom_target(configure_module_files ALL DEPENDS ${CONFIGURED_MODULE_FILES})
+    add_custom_target(configure_module_files DEPENDS ${CONFIGURED_MODULE_FILES})
     add_dependencies(vistle_doc configure_module_files)
     message("Configured documentation files: ${CONFIGURED_MODULE_FILES}")
 

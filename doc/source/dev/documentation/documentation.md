@@ -1,7 +1,23 @@
 How to write Documentation
 ==========================
 The documentation is written in markdown (.md) files. The root directory is 
-vistle/doc/source. Markdown files that are named like the directory they are in will function as the main article. They are automatically extended by links to the other markdown files in their directory followed by links to the subdirectories.
+vistle/doc/source. Use the index.rst files in each directory to include your markdown files.
+Links to other markdown files can be set with relative paths: 
+```
+[name](../pathToName.md)
+```
+Links to Vistle modules will be automatically generated for keys with the syntax:
+```
+[ModuleName]()
+```
+Pictures should be checked in under 
+    
+    vistle/doc/source/pictures
+
+and can be referenced by
+```
+![](pictureFileName.png)   
+```
 
 Documentation for modules is handled specially: their source markdown files must reside in the source tree module directory and be named after the module it describes (vistle/modules/category/modulename.md). The module documentation can contain special tags that are replaced when the documentation is built:
 

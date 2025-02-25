@@ -302,7 +302,7 @@ def generateModuleDescriptions() -> None:
             # check if its an optional tag
             if tag is not None:
                 line = optional_tags[tag](mod, value)
-        line = relinkImage(line, MODULE_SOURCE_DIR, DESTDIR)
+        # line = relinkImage(line, MODULE_SOURCE_DIR, DESTDIR)
         output.append(line)
 
     #create directory if not exists
