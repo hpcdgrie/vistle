@@ -200,17 +200,16 @@ endmacro()
 macro(generate_snapshots targetname network_file)
     if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/${network_file}.vwp
     )#if we have a viewpoint file we can generate an result image, only first viewpoint is considered, only first cover is considered
+        set(output_dir ${VISTLE_DOCUMENTATION_DIR}/docs/source/pictures)
         add_custom_command(
-            OUTPUT ${CMAKE_CURRENT_LIST_DIR}/${network_file}_result.png ${CMAKE_CURRENT_LIST_DIR}/${network_file}_workflow.png
+            OUTPUT ${output_dir}/${network_file}_result.png ${output_dir}/${network_file}_workflow.png
             COMMAND
                 ${CMAKE_COMMAND} -E env COCONFIG=${PROJECT_SOURCE_DIR}/doc/config.vistle.doc.xml VISTLE_DOC_IMAGE_NAME=${network_file}
-                VISTLE_DOC_SOURCE_DIR=${CMAKE_CURRENT_LIST_DIR} VISTLE_DOC_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR} vistle
-                ${PROJECT_SOURCE_DIR}/doc/resultSnapShot.py
+                VISTLE_DOC_SOURCE_DIR=${output_dir} VISTLE_DOC_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR} vistle ${PROJECT_SOURCE_DIR}/doc/tools/resultSnapShot.py
             DEPENDS ${CMAKE_CURRENT_LIST_DIR}/${network_file}.vsl ${CMAKE_CURRENT_LIST_DIR}/${network_file}.vwp ${targetname}
-                    ${PROJECT_SOURCE_DIR}/doc/resultSnapShot.py
+                    ${PROJECT_SOURCE_DIR}/doc/tools/resultSnapShot.py
             COMMENT "Generating network and result snapshot for " ${network_file}.vsl)
-        add_custom_target(${targetname}_${network_file}_result DEPENDS ${CMAKE_CURRENT_LIST_DIR}/${network_file}_result.png
-                                                                       ${CMAKE_CURRENT_LIST_DIR}/${network_file}_workflow.png)
+        add_custom_target(${targetname}_${network_file}_result DEPENDS ${output_dir}/${network_file}_result.png ${output_dir}/${network_file}_workflow.png)
         add_dependencies(${targetname}_doc ${targetname}_${network_file}_result)
     else()
         message(
