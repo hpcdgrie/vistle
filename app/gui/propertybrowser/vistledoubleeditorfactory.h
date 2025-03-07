@@ -16,6 +16,10 @@ protected:
     QWidget *createEditor(QtDoublePropertyManager *manager, QtProperty *property, QWidget *parent);
     void disconnectPropertyManager(QtDoublePropertyManager *manager);
 
+signals:
+    void buttonPressed(QString name);
+    void buttonReleased(QString name);
+
 private:
     VistleDoubleSpinBoxFactoryPrivate *d_ptr;
     Q_DECLARE_PRIVATE(VistleDoubleSpinBoxFactory)
