@@ -91,6 +91,15 @@ Parameters::Parameters(QWidget *parent, Qt::WindowFlags f)
     VistleDoubleSpinBoxFactory *doubleSpinBoxFactory = new VistleDoubleSpinBoxFactory(this);
     setFactoryForManager(m_floatManager, doubleSpinBoxFactory);
     setFactoryForManager(m_vectorManager->subDoublePropertyManager(), doubleSpinBoxFactory);
+    connect(doubleSpinBoxFactory, &VistleDoubleSpinBoxFactory::buttonPressed, this, [this](QString name) {
+        std::cerr << "button pressed for module " << m_moduleId << " param " << name.toStdString() << std::endl;
+        emit dragParameterConnection(m_moduleId, name);
+    });
+    connect(doubleSpinBoxFactory, &VistleDoubleSpinBoxFactory::buttonReleased, this, [this](QString name) {
+        std::cerr << "button released for module " << m_moduleId << " param " << name.toStdString() << std::endl;
+        emit dropParameterConnection(m_moduleId, name);
+    });
+
 
     VistleLineEditFactory *lineEditFactory = new VistleLineEditFactory(this);
     setFactoryForManager(m_stringManager, lineEditFactory);

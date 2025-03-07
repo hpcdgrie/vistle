@@ -37,6 +37,9 @@ public:
     void setVistleObserver(VistleObserver *observer);
     void setVistleConnection(vistle::VistleConnection *conn);
     void setModule(int id);
+signals:
+    void dragParameterConnection(int moduleId, QString parameterName);
+    void dropParameterConnection(int moduleId, QString parameterName);
 
 private slots:
     void newParameter(int moduleId, QString parameterName);

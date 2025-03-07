@@ -30,17 +30,18 @@ set(HEADERS
     ../../../lib/3rdparty/qt-solutions/qtpropertybrowser/src/qtpropertymanager.h
     ../../../lib/3rdparty/qt-solutions/qtpropertybrowser/src/qttreepropertybrowser.h
     ../../../lib/3rdparty/qt-solutions/qtpropertybrowser/src/qtvariantproperty.h
+    propertywIthdragbutton.h
     qlongspinbox.h
-    qtlongpropertymanager.h
     qtlongeditorfactory.h
-    vistledoubleeditorfactory.h
-    vistlelineeditfactory.h
-    vistlebrowserfactory.h
-    qtvectorpropertymanager.h
+    qtlongpropertymanager.h
     qtlongvectorpropertymanager.h
-    vistledoublepropertymanager.h
+    qtvectorpropertymanager.h
+    vistlebrowseredit.h
+    vistlebrowserfactory.h
     vistlebrowserpropertymanager.h
-    vistlebrowseredit.h)
+    vistledoubleeditorfactory.h
+    vistledoublepropertymanager.h
+    vistlelineeditfactory.h)
 
 set(FORMS)
 
