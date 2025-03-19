@@ -103,6 +103,8 @@ public:
     DataFlowNetwork *scene() const;
 
     static QColor hubColor(int hub);
+    //show popup window with own parameters to create a connection to the callers parameter
+    void showParameters(int moduleId, QString parameterName);
 signals:
     void createModuleCompound();
     void selectConnected(int direction, int id, QString port = QString());

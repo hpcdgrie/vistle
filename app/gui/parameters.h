@@ -37,6 +37,7 @@ public:
     void setVistleObserver(VistleObserver *observer);
     void setVistleConnection(vistle::VistleConnection *conn);
     void setModule(int id);
+    static const char *mimeFormat();
 
 private slots:
     void newParameter(int moduleId, QString parameterName);
@@ -50,6 +51,7 @@ private:
     void setParameterEnabled(QtProperty *prop, bool state);
     bool getExpandedState(QString name, bool &state);
     void addItemWithProperty(QtBrowserItem *item, QtProperty *prop);
+    QWidget *createEditor(QtProperty *property, QWidget *parent) override;
 
     int m_moduleId;
     vistle::VistleConnection *m_vistle;

@@ -27,6 +27,7 @@
 #include "uicontroller.h"
 #include "dataflowview.h"
 #include "modulebrowser.h"
+#include "parameterconnectionwidgets.h"
 
 #include <vistle/config/file.h>
 #include <vistle/config/array.h>
@@ -927,6 +928,26 @@ QColor Module::hubColor(int hub)
     const int g = 1 - (h >> 2) % 2;
     const int b = 1 - (h >> 1) % 2;
     return QColor(100 + r * 100, 100 + g * 100, 100 + b * 100);
+}
+
+void Module::showParameters(int moduleId, QString parameterName)
+{
+    auto params = scene()->getModuleParameters(m_id);
+    ParameterPopup *popup = new ParameterPopup(params);
+    connect(popup, &ParameterPopup::parameterClicked, this,
+            [this, popup, moduleId, parameterName](const QString &param) {
+                // Handle parameter button click
+                vistle::Port from(moduleId, parameterName.toStdString(), vistle::Port::Type::PARAMETER);
+                vistle::Port to(m_id, param.toStdString(), vistle::Port::Type::PARAMETER);
+                vistle::VistleConnection::the().connect(&from, &to);
+                popup->close();
+                delete popup;
+            });
+
+    QPointF modulePos = mapToScene(boundingRect().center());
+    QPoint globalPos = scene()->views().first()->mapToGlobal(modulePos.toPoint());
+    popup->move(globalPos);
+    popup->show();
 }
 
 void Module::mousePressEvent(QGraphicsSceneMouseEvent *event)

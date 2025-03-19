@@ -14,6 +14,8 @@
 
 #include "parameters.h"
 #include "vistleobserver.h"
+#include "parameterconnectionwidgets.h"
+
 #include <vistle/core/message.h>
 
 #include <QtGroupPropertyManager>
@@ -211,6 +213,31 @@ void Parameters::addItemWithProperty(QtBrowserItem *item, QtProperty *prop)
     bool expanded = false;
     if (getExpandedState(propertyToName(prop), expanded))
         setExpanded(item, expanded);
+}
+
+const char *Parameters::mimeFormat()
+{
+    return "application/x-parameterbrowser";
+}
+
+QWidget *Parameters::createEditor(QtProperty *property, QWidget *parent)
+{
+    QWidget *fullEditor = new QWidget(parent);
+    // auto button = new QPushButton("...", fullEditor);
+    auto editor = QtAbstractPropertyBrowser::createEditor(property, fullEditor);
+    if (!editor) {
+        delete fullEditor;
+        return nullptr;
+    }
+    auto button = new ParameterConnectionBtn(m_moduleId, property->propertyName(), fullEditor);
+    button->setFixedWidth(20);
+    QHBoxLayout *layout = new QHBoxLayout(fullEditor);
+    layout->addWidget(button);
+    layout->addWidget(editor);
+    layout->setContentsMargins(0, 0, 0, 0);
+    fullEditor->setLayout(layout);
+
+    return fullEditor;
 }
 
 void Parameters::newParameter(int moduleId, QString parameterName)
