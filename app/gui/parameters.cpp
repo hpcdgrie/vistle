@@ -14,6 +14,8 @@
 
 #include "parameters.h"
 #include "vistleobserver.h"
+#include "parameterconnectionbuttion.h"
+
 #include <vistle/core/message.h>
 
 #include <QtGroupPropertyManager>
@@ -22,8 +24,7 @@
 #include <QtDoublePropertyManager>
 #include <QtStringPropertyManager>
 #include <QtEnumPropertyManager>
-#include <QPushButton>
-#include <QHBoxLayout>
+
 
 #include "propertybrowser/qtlongpropertymanager.h"
 #include "propertybrowser/qtlongvectorpropertymanager.h"
@@ -93,15 +94,6 @@ Parameters::Parameters(QWidget *parent, Qt::WindowFlags f)
     VistleDoubleSpinBoxFactory *doubleSpinBoxFactory = new VistleDoubleSpinBoxFactory(this);
     setFactoryForManager(m_floatManager, doubleSpinBoxFactory);
     setFactoryForManager(m_vectorManager->subDoublePropertyManager(), doubleSpinBoxFactory);
-    connect(doubleSpinBoxFactory, &VistleDoubleSpinBoxFactory::buttonPressed, this, [this](QString name) {
-        std::cerr << "button pressed for module " << m_moduleId << " param " << name.toStdString() << std::endl;
-        emit dragParameterConnection(m_moduleId, name);
-    });
-    connect(doubleSpinBoxFactory, &VistleDoubleSpinBoxFactory::buttonReleased, this, [this](QString name) {
-        std::cerr << "button released for module " << m_moduleId << " param " << name.toStdString() << std::endl;
-        emit dropParameterConnection(m_moduleId, name);
-    });
-
 
     VistleLineEditFactory *lineEditFactory = new VistleLineEditFactory(this);
     setFactoryForManager(m_stringManager, lineEditFactory);
@@ -224,18 +216,31 @@ void Parameters::addItemWithProperty(QtBrowserItem *item, QtProperty *prop)
         setExpanded(item, expanded);
 }
 
+const char *Parameters::mimeFormat()
+{
+    return "application/x-parameterbrowser";
+}
+
 QWidget *Parameters::createEditor(QtProperty *property, QWidget *parent)
 {
     std::cerr << "Parameters::createEditor: " << property->propertyName().toStdString() << std::endl;
     QWidget *fullEditor = new QWidget(parent);
-    auto button = new QPushButton("...", fullEditor);
-    button->setFixedWidth(20);
+    // auto button = new QPushButton("...", fullEditor);
     auto editor = QtAbstractPropertyBrowser::createEditor(property, fullEditor);
+    if (!editor) {
+        delete fullEditor;
+        return nullptr;
+    }
+    auto button = new ParameterConnectionBtn(m_moduleId, property->propertyName(), fullEditor);
+    std::cerr << "Parameters::createEditor: " << property->propertyName().toStdString() << " -> " << m_moduleId
+              << std::endl;
+    button->setFixedWidth(20);
     QHBoxLayout *layout = new QHBoxLayout(fullEditor);
     layout->addWidget(button);
     layout->addWidget(editor);
     layout->setContentsMargins(0, 0, 0, 0);
     fullEditor->setLayout(layout);
+
     return fullEditor;
 }
 

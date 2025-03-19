@@ -57,6 +57,8 @@ public:
     Module *newModule(QString modName);
     Module *findModule(int id) const;
     Module *findModule(const boost::uuids::uuid &spawnUuid) const;
+    Module *findModule(const QPointF &pos) const;
+    QList<QString> getModuleParameters(int id) const;
 
     bool moveModule(int moduleId, float x, float y);
 

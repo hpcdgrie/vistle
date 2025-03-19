@@ -37,6 +37,8 @@ public:
     void setVistleObserver(VistleObserver *observer);
     void setVistleConnection(vistle::VistleConnection *conn);
     void setModule(int id);
+    static const char *mimeFormat();
+
 signals:
     void dragParameterConnection(int moduleId, QString parameterName);
     void dropParameterConnection(int moduleId, QString parameterName);

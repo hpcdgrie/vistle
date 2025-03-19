@@ -23,42 +23,30 @@ public:
     QValidator::State validate(QString &text, int &pos) const { return QValidator::Acceptable; }
 };
 
-// creates VistleDoubleSpinBoxWithButton
-PROPERTY_WITHDRAG_BUTTON1(VistleDoubleSpinBox)
-Q_OBJECT
-
-signals:
-    void buttonClicked();
-    void buttonPressed();
-    void buttonReleased();
-
-    PROPERTY_WITHDRAG_BUTTON2(VistleDoubleSpinBox)
-
-
     // VistleDoubleSpinBoxFactory
 
-    class VistleDoubleSpinBoxFactoryPrivate: public EditorFactoryPrivate<VistleDoubleSpinBoxWithButton> {
-        VistleDoubleSpinBoxFactory *q_ptr;
-        Q_DECLARE_PUBLIC(VistleDoubleSpinBoxFactory)
-    public:
-        void slotPropertyChanged(QtProperty *property, double value);
-        void slotRangeChanged(QtProperty *property, double min, double max);
-        void slotSingleStepChanged(QtProperty *property, double step);
-        void slotDecimalsChanged(QtProperty *property, int prec);
-        void slotReadOnlyChanged(QtProperty *property, bool readOnly);
-        void slotSetValue(double value);
-    };
+class VistleDoubleSpinBoxFactoryPrivate: public EditorFactoryPrivate<VistleDoubleSpinBox> {
+    VistleDoubleSpinBoxFactory *q_ptr;
+    Q_DECLARE_PUBLIC(VistleDoubleSpinBoxFactory)
+public:
+    void slotPropertyChanged(QtProperty *property, double value);
+    void slotRangeChanged(QtProperty *property, double min, double max);
+    void slotSingleStepChanged(QtProperty *property, double step);
+    void slotDecimalsChanged(QtProperty *property, int prec);
+    void slotReadOnlyChanged(QtProperty *property, bool readOnly);
+    void slotSetValue(double value);
+};
 
 void VistleDoubleSpinBoxFactoryPrivate::slotPropertyChanged(QtProperty *property, double value)
 {
-    QList<VistleDoubleSpinBoxWithButton *> editors = m_createdEditors[property];
-    QListIterator<VistleDoubleSpinBoxWithButton *> itEditor(m_createdEditors[property]);
+    QList<VistleDoubleSpinBox *> editors = m_createdEditors[property];
+    QListIterator<VistleDoubleSpinBox *> itEditor(m_createdEditors[property]);
     while (itEditor.hasNext()) {
-        VistleDoubleSpinBoxWithButton *editor = itEditor.next();
-        if (editor->property->value() != value) {
-            editor->property->blockSignals(true);
-            editor->property->setValue(value);
-            editor->property->blockSignals(false);
+        VistleDoubleSpinBox *editor = itEditor.next();
+        if (editor->value() != value) {
+            editor->blockSignals(true);
+            editor->setValue(value);
+            editor->blockSignals(false);
         }
     }
 }
@@ -72,14 +60,14 @@ void VistleDoubleSpinBoxFactoryPrivate::slotRangeChanged(QtProperty *property, d
     if (!manager)
         return;
 
-    QList<VistleDoubleSpinBoxWithButton *> editors = m_createdEditors[property];
-    QListIterator<VistleDoubleSpinBoxWithButton *> itEditor(editors);
+    QList<VistleDoubleSpinBox *> editors = m_createdEditors[property];
+    QListIterator<VistleDoubleSpinBox *> itEditor(editors);
     while (itEditor.hasNext()) {
-        VistleDoubleSpinBoxWithButton *editor = itEditor.next();
-        editor->property->blockSignals(true);
-        editor->property->setRange(min, max);
-        editor->property->setValue(manager->value(property));
-        editor->property->blockSignals(false);
+        VistleDoubleSpinBox *editor = itEditor.next();
+        editor->blockSignals(true);
+        editor->setRange(min, max);
+        editor->setValue(manager->value(property));
+        editor->blockSignals(false);
     }
 }
 
@@ -92,13 +80,13 @@ void VistleDoubleSpinBoxFactoryPrivate::slotSingleStepChanged(QtProperty *proper
     if (!manager)
         return;
 
-    QList<VistleDoubleSpinBoxWithButton *> editors = m_createdEditors[property];
-    QListIterator<VistleDoubleSpinBoxWithButton *> itEditor(editors);
+    QList<VistleDoubleSpinBox *> editors = m_createdEditors[property];
+    QListIterator<VistleDoubleSpinBox *> itEditor(editors);
     while (itEditor.hasNext()) {
-        VistleDoubleSpinBoxWithButton *editor = itEditor.next();
-        editor->property->blockSignals(true);
-        editor->property->setSingleStep(step);
-        editor->property->blockSignals(false);
+        VistleDoubleSpinBox *editor = itEditor.next();
+        editor->blockSignals(true);
+        editor->setSingleStep(step);
+        editor->blockSignals(false);
     }
 }
 
@@ -111,12 +99,12 @@ void VistleDoubleSpinBoxFactoryPrivate::slotReadOnlyChanged(QtProperty *property
     if (!manager)
         return;
 
-    QListIterator<VistleDoubleSpinBoxWithButton *> itEditor(m_createdEditors[property]);
+    QListIterator<VistleDoubleSpinBox *> itEditor(m_createdEditors[property]);
     while (itEditor.hasNext()) {
-        VistleDoubleSpinBoxWithButton *editor = itEditor.next();
-        editor->property->blockSignals(true);
-        editor->property->setReadOnly(readOnly);
-        editor->property->blockSignals(false);
+        VistleDoubleSpinBox *editor = itEditor.next();
+        editor->blockSignals(true);
+        editor->setReadOnly(readOnly);
+        editor->blockSignals(false);
     }
 }
 
@@ -129,22 +117,22 @@ void VistleDoubleSpinBoxFactoryPrivate::slotDecimalsChanged(QtProperty *property
     if (!manager)
         return;
 
-    QList<VistleDoubleSpinBoxWithButton *> editors = m_createdEditors[property];
-    QListIterator<VistleDoubleSpinBoxWithButton *> itEditor(editors);
+    QList<VistleDoubleSpinBox *> editors = m_createdEditors[property];
+    QListIterator<VistleDoubleSpinBox *> itEditor(editors);
     while (itEditor.hasNext()) {
-        VistleDoubleSpinBoxWithButton *editor = itEditor.next();
-        editor->property->blockSignals(true);
-        editor->property->setDecimals(prec);
-        editor->property->setValue(manager->value(property));
-        editor->property->blockSignals(false);
+        VistleDoubleSpinBox *editor = itEditor.next();
+        editor->blockSignals(true);
+        editor->setDecimals(prec);
+        editor->setValue(manager->value(property));
+        editor->blockSignals(false);
     }
 }
 
 void VistleDoubleSpinBoxFactoryPrivate::slotSetValue(double value)
 {
     QObject *object = q_ptr->sender();
-    const QMap<VistleDoubleSpinBoxWithButton *, QtProperty *>::ConstIterator itcend = m_editorToProperty.constEnd();
-    for (QMap<VistleDoubleSpinBoxWithButton *, QtProperty *>::ConstIterator itEditor = m_editorToProperty.constBegin();
+    const QMap<VistleDoubleSpinBox *, QtProperty *>::ConstIterator itcend = m_editorToProperty.constEnd();
+    for (QMap<VistleDoubleSpinBox *, QtProperty *>::ConstIterator itEditor = m_editorToProperty.constBegin();
          itEditor != itcend; ++itEditor) {
         if (itEditor.key() == object) {
             QtProperty *property = itEditor.value();
@@ -159,7 +147,7 @@ void VistleDoubleSpinBoxFactoryPrivate::slotSetValue(double value)
 
 /*! \class VistleDoubleSpinBoxFactory
 
-    \brief The VistleDoubleSpinBoxFactory class provides VistleDoubleSpinBoxWithButton
+    \brief The VistleDoubleSpinBoxFactory class provides VistleDoubleSpinBox
     widgets for properties created by QtDoublePropertyManager objects.
 
     \sa QtAbstractEditorFactory, QtDoublePropertyManager
@@ -208,23 +196,18 @@ void VistleDoubleSpinBoxFactory::connectPropertyManager(QtDoublePropertyManager 
 QWidget *VistleDoubleSpinBoxFactory::createEditor(QtDoublePropertyManager *manager, QtProperty *property,
                                                   QWidget *parent)
 {
-    VistleDoubleSpinBoxWithButton *editor = d_ptr->createEditor(property, parent);
-    editor->property->setSingleStep(manager->singleStep(property));
-    editor->property->setDecimals(manager->decimals(property));
-    editor->property->setRange(manager->minimum(property), manager->maximum(property));
-    editor->property->setValue(manager->value(property));
-    editor->property->setKeyboardTracking(false);
-    editor->property->setReadOnly(manager->isReadOnly(property));
+    VistleDoubleSpinBox *editor = d_ptr->createEditor(property, parent);
+    editor->setSingleStep(manager->singleStep(property));
+    editor->setDecimals(manager->decimals(property));
+    editor->setRange(manager->minimum(property), manager->maximum(property));
+    editor->setValue(manager->value(property));
+    editor->setKeyboardTracking(false);
+    editor->setReadOnly(manager->isReadOnly(property));
 
-    connect(editor->property, SIGNAL(valueChanged(double)), this, SLOT(slotSetValue(double)));
-    connect(editor->property, SIGNAL(destroyed(QObject *)), this, SLOT(slotEditorDestroyed(QObject *)));
+    connect(editor, SIGNAL(valueChanged(double)), this, SLOT(slotSetValue(double)));
+    connect(editor, SIGNAL(destroyed(QObject *)), this, SLOT(slotEditorDestroyed(QObject *)));
 
     auto propertyName = property->propertyName();
-    connect(editor, &VistleDoubleSpinBoxWithButton::buttonPressed, this,
-            [this, propertyName]() { emit buttonPressed(propertyName); });
-    connect(editor, &VistleDoubleSpinBoxWithButton::buttonReleased, this,
-            [this, propertyName]() { emit buttonReleased(propertyName); });
-
     return editor;
 }
 
