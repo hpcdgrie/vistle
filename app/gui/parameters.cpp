@@ -22,6 +22,8 @@
 #include <QtDoublePropertyManager>
 #include <QtStringPropertyManager>
 #include <QtEnumPropertyManager>
+#include <QPushButton>
+#include <QHBoxLayout>
 
 #include "propertybrowser/qtlongpropertymanager.h"
 #include "propertybrowser/qtlongvectorpropertymanager.h"
@@ -220,6 +222,21 @@ void Parameters::addItemWithProperty(QtBrowserItem *item, QtProperty *prop)
     bool expanded = false;
     if (getExpandedState(propertyToName(prop), expanded))
         setExpanded(item, expanded);
+}
+
+QWidget *Parameters::createEditor(QtProperty *property, QWidget *parent)
+{
+    std::cerr << "Parameters::createEditor: " << property->propertyName().toStdString() << std::endl;
+    QWidget *fullEditor = new QWidget(parent);
+    auto button = new QPushButton("...", fullEditor);
+    button->setFixedWidth(20);
+    auto editor = QtAbstractPropertyBrowser::createEditor(property, fullEditor);
+    QHBoxLayout *layout = new QHBoxLayout(fullEditor);
+    layout->addWidget(button);
+    layout->addWidget(editor);
+    layout->setContentsMargins(0, 0, 0, 0);
+    fullEditor->setLayout(layout);
+    return fullEditor;
 }
 
 void Parameters::newParameter(int moduleId, QString parameterName)

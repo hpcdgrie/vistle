@@ -53,6 +53,7 @@ private:
     void setParameterEnabled(QtProperty *prop, bool state);
     bool getExpandedState(QString name, bool &state);
     void addItemWithProperty(QtBrowserItem *item, QtProperty *prop);
+    QWidget *createEditor(QtProperty *property, QWidget *parent) override;
 
     int m_moduleId;
     vistle::VistleConnection *m_vistle;
