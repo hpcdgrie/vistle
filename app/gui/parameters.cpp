@@ -55,7 +55,6 @@ static M *addPropertyManager(Parameters *p)
 
 Parameters::Parameters(QWidget *parent, Qt::WindowFlags f)
 : Parameters::PropertyBrowser(parent)
-, m_moduleId(0)
 , m_vistle(nullptr)
 , m_groupManager(nullptr)
 , m_boolManager(nullptr)
@@ -217,28 +216,58 @@ void Parameters::addItemWithProperty(QtBrowserItem *item, QtProperty *prop)
 
 const char *Parameters::mimeFormat()
 {
-    return "application/x-parameterbrowser";
+    return "applicatio1n/x-parameterbrowser";
 }
 
-QWidget *Parameters::createEditor(QtProperty *property, QWidget *parent)
-{
-    QWidget *fullEditor = new QWidget(parent);
-    // auto button = new QPushButton("...", fullEditor);
-    auto editor = QtAbstractPropertyBrowser::createEditor(property, fullEditor);
-    if (!editor) {
-        delete fullEditor;
-        return nullptr;
-    }
-    auto button = new ParameterConnectionBtn(m_moduleId, property->propertyName(), fullEditor);
-    button->setFixedWidth(20);
-    QHBoxLayout *layout = new QHBoxLayout(fullEditor);
-    layout->addWidget(button);
-    layout->addWidget(editor);
-    layout->setContentsMargins(0, 0, 0, 0);
-    fullEditor->setLayout(layout);
+// QWidget *Parameters::createEditor(QtProperty *property, QWidget *parent)
+// {
+//     QWidget *fullEditor = new QWidget(parent);
+//     auto editor = QtAbstractPropertyBrowser::createEditor(property, fullEditor);
+//     if (!editor) {
+//         delete fullEditor;
+//         return nullptr;
+//     }
+//     auto button = new ParameterConnectionBtn(m_moduleId, property->propertyName(), fullEditor);
+//     button->setFixedWidth(20);
+//     QHBoxLayout *layout = new QHBoxLayout(fullEditor);
+//     layout->addWidget(button);
+//     layout->addWidget(editor);
+//     layout->setContentsMargins(0, 0, 0, 0);
+//     fullEditor->setLayout(layout);
 
-    return fullEditor;
-}
+//     return fullEditor;
+// }
+
+// void Parameters::itemChanged(QtBrowserItem *item)
+// {
+//     updateItem(item);
+// }
+
+// void Parameters::itemInserted(QtBrowserItem *item, QtBrowserItem *afterItem)
+// {
+//     updateItem(item);
+// }
+
+// void Parameters::itemRemoved(QtBrowserItem *item)
+// {}
+
+// void Parameters::updateItem(QtBrowserItem *item)
+// {
+//     QtProperty *property = item->property();
+//     QWidget *editor = createEditor(property, this);
+//     if (editor) {
+//         // Replace the label with a button
+//         QPushButton *button = new QPushButton(property->propertyName(), this);
+//         connect(button, &QPushButton::clicked, this, [property]() {
+//             // Handle button click
+//             qDebug() << "Button clicked for property:" << property->propertyName();
+//         });
+
+//         // Set the button as the widget for the property name
+//         setItemWidget(item, 0, button);
+//     }
+// }
+
 
 void Parameters::newParameter(int moduleId, QString parameterName)
 {

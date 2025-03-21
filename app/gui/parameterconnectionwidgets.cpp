@@ -6,6 +6,8 @@
 #include <QMimeData>
 #include <QScrollArea>
 
+#include <iostream>
+
 using namespace gui;
 
 ParameterConnectionBtn::ParameterConnectionBtn(int moduleId, const QString &paramName, QWidget *parent)
@@ -32,6 +34,31 @@ void ParameterConnectionBtn::mousePressEvent(QMouseEvent *event)
     QPushButton::mousePressEvent(event);
 }
 
+ParameterConnectionLabel::ParameterConnectionLabel(int moduleId, const QString &paramName, QWidget *parent)
+: QLabel(parent), m_moduleId(moduleId), m_paramName(paramName)
+{}
+
+void ParameterConnectionLabel::mousePressEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton) {
+        QDrag *drag = new QDrag(this);
+        QMimeData *mimeData = new QMimeData;
+
+        // Set the MIME data
+        mimeData->setText(QString("Module ID: %1\nParameter Name: %2\n").arg(m_moduleId).arg(m_paramName));
+        QByteArray encodedData;
+        QDataStream stream(&encodedData, QIODevice::WriteOnly);
+        stream << m_moduleId << m_paramName;
+        mimeData->setData(Parameters::mimeFormat(), encodedData);
+        drag->setMimeData(mimeData);
+
+        // Start the drag event
+        drag->exec(Qt::CopyAction | Qt::MoveAction);
+        std::cerr << "dragging " << m_moduleId << ", " << m_paramName.toStdString() << std::endl;
+    }
+    QLabel::mousePressEvent(event);
+}
+
 QStringList putSystemParamsAtTheEnd(const QStringList &params)
 {
     auto parameters = params;
@@ -53,26 +80,27 @@ ParameterPopup::ParameterPopup(const QStringList &parameters, QWidget *parent)
     QVBoxLayout *layout = new QVBoxLayout(this);
 
     // Add search field
-    QLineEdit *searchField = new QLineEdit(this);
-    searchField->setPlaceholderText("Search...");
-    layout->addWidget(searchField);
-    connect(searchField, &QLineEdit::textChanged, this, &ParameterPopup::filterParameters);
+    m_searchField = new QLineEdit(this);
+    m_searchField->setPlaceholderText("Search...");
+    layout->addWidget(m_searchField);
+    connect(m_searchField, &QLineEdit::textChanged, this, &ParameterPopup::filterParameters);
 
-    // Add scroll area
-    m_scrollArea = new QScrollArea(this);
-    m_container = new QWidget(m_scrollArea);
-    m_containerLayout = new QVBoxLayout(m_container);
-
-    m_container->setLayout(m_containerLayout);
-    m_scrollArea->setWidget(m_container);
-    m_scrollArea->setWidgetResizable(true);
-    layout->addWidget(m_scrollArea);
+    // Add list widget
+    m_listWidget = new QListWidget(this);
+    layout->addWidget(m_listWidget);
+    connect(m_listWidget, &QListWidget::itemClicked, this, &ParameterPopup::onParameterSelected);
 
     setLayout(layout);
     setMaximumHeight(300); // Set the maximum height for the popup
 
-    // Populate initial buttons
-    populateButtons(m_parameters);
+    // Populate initial list widget
+    populateListWidget(m_parameters);
+}
+
+void ParameterPopup::setParameters(const QStringList &parameters)
+{
+    m_parameters = parameters;
+    populateListWidget(m_parameters);
 }
 
 void ParameterPopup::filterParameters(const QString &query)
@@ -83,22 +111,19 @@ void ParameterPopup::filterParameters(const QString &query)
             filteredParameters << param;
         }
     }
-    populateButtons(filteredParameters);
+    populateListWidget(filteredParameters);
 }
 
-void ParameterPopup::populateButtons(const QStringList &parameters)
+void ParameterPopup::populateListWidget(const QStringList &parameters)
 {
-    // Clear existing buttons
-    QLayoutItem *child;
-    while ((child = m_containerLayout->takeAt(0)) != nullptr) {
-        delete child->widget();
-        delete child;
-    }
-
-    // Add new buttons
+    m_listWidget->clear();
     for (const QString &param: parameters) {
-        QPushButton *button = new QPushButton(param, this);
-        m_containerLayout->addWidget(button);
-        connect(button, &QPushButton::clicked, this, [this, param]() { emit parameterClicked(param); });
+        QListWidgetItem *item = new QListWidgetItem(param, m_listWidget);
+        m_listWidget->addItem(item);
     }
+}
+
+void ParameterPopup::onParameterSelected(QListWidgetItem *item)
+{
+    emit parameterSelected(item->text());
 }

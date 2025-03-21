@@ -63,7 +63,7 @@ Module::Module(QGraphicsItem *parent, QString name)
     setFlag(QGraphicsItem::ItemSendsGeometryChanges);
     setAcceptHoverEvents(true);
     setCursor(Qt::OpenHandCursor);
-
+    createParameterPopup();
     createActions();
     createMenus();
     createGeometry();
@@ -87,6 +87,7 @@ Module::~Module()
     delete m_selectUpstreamAct;
     delete m_selectDownstreamAct;
     delete m_createModuleGroup;
+    delete m_parameterPopup;
 }
 
 float Module::gridSpacingX()
@@ -930,24 +931,28 @@ QColor Module::hubColor(int hub)
     return QColor(100 + r * 100, 100 + g * 100, 100 + b * 100);
 }
 
-void Module::showParameters(int moduleId, QString parameterName)
+void Module::createParameterPopup()
+{
+    m_parameterPopup = new ParameterPopup(QStringList{});
+    connect(m_parameterPopup, &ParameterPopup::parameterSelected, this, [this](const QString &param) {
+        // Handle parameter button click
+        vistle::Port from(m_parameterConnectionRequest.moduleId, m_parameterConnectionRequest.paramName.toStdString(),
+                          vistle::Port::Type::PARAMETER);
+        vistle::Port to(m_id, param.toStdString(), vistle::Port::Type::PARAMETER);
+        vistle::VistleConnection::the().connect(&from, &to);
+        m_parameterPopup->close();
+    });
+}
+
+void Module::showParameters(const ParameterConnectionRequest &request)
 {
     auto params = scene()->getModuleParameters(m_id);
-    ParameterPopup *popup = new ParameterPopup(params);
-    connect(popup, &ParameterPopup::parameterClicked, this,
-            [this, popup, moduleId, parameterName](const QString &param) {
-                // Handle parameter button click
-                vistle::Port from(moduleId, parameterName.toStdString(), vistle::Port::Type::PARAMETER);
-                vistle::Port to(m_id, param.toStdString(), vistle::Port::Type::PARAMETER);
-                vistle::VistleConnection::the().connect(&from, &to);
-                popup->close();
-                delete popup;
-            });
-
+    m_parameterPopup->setParameters(params);
+    m_parameterConnectionRequest = request;
     QPointF modulePos = mapToScene(boundingRect().center());
     QPoint globalPos = scene()->views().first()->mapToGlobal(modulePos.toPoint());
-    popup->move(globalPos);
-    popup->show();
+    m_parameterPopup->move(globalPos);
+    m_parameterPopup->show();
 }
 
 void Module::mousePressEvent(QGraphicsSceneMouseEvent *event)

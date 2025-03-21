@@ -184,7 +184,7 @@ void DataFlowView::dropEvent(QDropEvent *event)
                 stream >> moduleId;
                 QString parameterName;
                 stream >> parameterName;
-                module->showParameters(moduleId, parameterName);
+                module->showParameters({moduleId, parameterName});
             }
         }
     }

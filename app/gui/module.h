@@ -19,9 +19,9 @@
 #include "dataflownetwork.h"
 
 namespace gui {
-
 class Connection;
 class DataFlowNetwork;
+class ParameterPopup;
 
 const bool LayersAsOpacity = true;
 
@@ -41,6 +41,10 @@ public:
     struct Message {
         int type;
         QString text;
+    };
+    struct ParameterConnectionRequest {
+        int moduleId;
+        QString paramName;
     };
 
     Module(QGraphicsItem *parent = nullptr, QString name = QString());
@@ -104,7 +108,7 @@ public:
 
     static QColor hubColor(int hub);
     //show popup window with own parameters to create a connection to the callers parameter
-    void showParameters(int moduleId, QString parameterName);
+    void showParameters(const ParameterConnectionRequest &request);
 signals:
     void createModuleCompound();
     void selectConnected(int direction, int id, QString port = QString());
@@ -145,6 +149,7 @@ private:
     void doLayout();
     void sendSpawn(int hub, const std::string &module, vistle::message::Spawn::ReferenceType type);
     void setToolTip(QString text);
+    void createParameterPopup();
 
     QMenu *m_moduleMenu = nullptr;
     QAction *m_selectUpstreamAct = nullptr, *m_selectDownstreamAct = nullptr, *m_selectConnectedAct = nullptr;
@@ -163,7 +168,8 @@ private:
     QAction *m_cloneModuleLinked = nullptr;
     QMenu *m_layerMenu = nullptr;
     QMenu *m_advancedMenu = nullptr;
-
+    ParameterPopup *m_parameterPopup = nullptr;
+    ParameterConnectionRequest m_parameterConnectionRequest;
 
     int m_hub;
     int m_id;
