@@ -78,6 +78,7 @@ public:
 
 signals:
     void toggleOutputStreaming(int moduleId, bool enable);
+    void highlightModule(int moduleId);
 
 public slots:
     void addModule(int moduleId, const boost::uuids::uuid &spawnUuid, QString name);

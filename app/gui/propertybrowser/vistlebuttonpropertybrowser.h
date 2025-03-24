@@ -16,18 +16,21 @@ public:
 
     void setExpanded(QtBrowserItem *item, bool expanded);
     bool isExpanded(QtBrowserItem *item) const;
-
-Q_SIGNALS:
-
+    Q_SIGNALS:
+    
     void collapsed(QtBrowserItem *item);
     void expanded(QtBrowserItem *item);
-
-protected:
+    void disconnectParameters(int moduleId, QString fromName, QString toName);
+    void highlightModule(int moduleId);
+    
+    protected:
     virtual void itemInserted(QtBrowserItem *item, QtBrowserItem *afterItem);
     virtual void itemRemoved(QtBrowserItem *item);
     virtual void itemChanged(QtBrowserItem *item);
     // additional nodule id of the module for which the properties are shown
     int m_moduleId = 0;
+protected slots:
+    void parametersConnected(int fromId, QString fromName, int toId, QString toName);
 private:
     VistleButtonPropertyBrowserPrivate *d_ptr;
     Q_DECLARE_PRIVATE(VistleButtonPropertyBrowser)

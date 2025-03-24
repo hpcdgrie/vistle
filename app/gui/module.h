@@ -140,6 +140,7 @@ public slots:
     void projectToGrid();
     void setParameterDefaults();
     void showError();
+    void highlightModule(int moduleId);
 
 private:
     void createGeometry();
@@ -180,6 +181,7 @@ private:
     QString m_name;
     QString m_displayName;
     Module::Status m_Status;
+    Module::Status m_StatusBeforeHighlight;
     QString m_statusText;
     QString m_info;
     QString m_tooltip;
@@ -194,7 +196,8 @@ private:
     qreal m_fontHeight;
     std::map<vistle::Port, Port *> m_vistleToGui;
 
-    QColor m_borderColor;
+    QColor m_borderColor, m_statusBorderColor;
+    QColor m_borderColorHighlight = Qt::darkMagenta;
 };
 
 template<class T>

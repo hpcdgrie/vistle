@@ -20,9 +20,24 @@ class VistleButtonPropertyBrowserPrivate
     Q_DECLARE_PUBLIC(VistleButtonPropertyBrowser)
 public:
 
+struct WidgetItem
+{
+    WidgetItem() : widget(0), label(0), widgetLabel(0),
+            button(0), container(0), layout(0), /*line(0), */parent(0), expanded(false) { }
+    QWidget *widget; // can be null
+    QLabel *label; // main label with property name
+    QLabel *widgetLabel; // label substitute showing the current value if there is no widget
+    QToolButton *button; // expandable button for items with children
+    QWidget *container; // container which is expanded when the button is clicked
+    QGridLayout *layout; // layout in container
+    WidgetItem *parent;
+    QList<WidgetItem *> children;
+    bool expanded;
+};
+
     void init(QWidget *parent);
 
-    void propertyInserted(int moduleId, QtBrowserItem *index, QtBrowserItem *afterIndex);
+    WidgetItem *propertyInserted(int moduleId, QtBrowserItem *index, QtBrowserItem *afterIndex);
     void propertyRemoved(QtBrowserItem *index);
     void propertyChanged(QtBrowserItem *index);
     QWidget *createEditor(QtProperty *property, QWidget *parent) const
@@ -31,21 +46,8 @@ public:
     void slotEditorDestroyed();
     void slotUpdate();
     void slotToggled(bool checked);
+    void parametersConnected(int fromId, QString fromName, int toId, QString toName);
 
-    struct WidgetItem
-    {
-        WidgetItem() : widget(0), label(0), widgetLabel(0),
-                button(0), container(0), layout(0), /*line(0), */parent(0), expanded(false) { }
-        QWidget *widget; // can be null
-        QLabel *label; // main label with property name
-        QLabel *widgetLabel; // label substitute showing the current value if there is no widget
-        QToolButton *button; // expandable button for items with children
-        QWidget *container; // container which is expanded when the button is clicked
-        QGridLayout *layout; // layout in container
-        WidgetItem *parent;
-        QList<WidgetItem *> children;
-        bool expanded;
-    };
 private:
     void updateLater();
     //this is the changed function to enable parameter connections via the WidgetItem::label
@@ -204,12 +206,24 @@ void VistleButtonPropertyBrowserPrivate::slotToggled(bool checked)
         emit q_ptr->collapsed(m_itemToIndex.value(item));
 }
 
+void VistleButtonPropertyBrowserPrivate::parametersConnected(int fromId, QString fromName, int toId, QString toName)
+{
+    for(auto item : m_indexToItem) {
+        if(item->label && item->label->text() == fromName) {
+            if(auto paramLabel = dynamic_cast<gui::ParameterConnectionLabel*>(item->label))
+                paramLabel->connectParam(toId, toName);
+        }
+    }
+}
+
+
+
 void VistleButtonPropertyBrowserPrivate::updateLater()
 {
     QTimer::singleShot(0, q_ptr, SLOT(slotUpdate()));
 }
 
-void VistleButtonPropertyBrowserPrivate::propertyInserted(int moduleId, QtBrowserItem *index, QtBrowserItem *afterIndex)
+VistleButtonPropertyBrowserPrivate::WidgetItem *VistleButtonPropertyBrowserPrivate::propertyInserted(int moduleId, QtBrowserItem *index, QtBrowserItem *afterIndex)
 {
     WidgetItem *afterItem = m_indexToItem.value(afterIndex);
     WidgetItem *parentItem = m_indexToItem.value(index->parent());
@@ -297,6 +311,7 @@ void VistleButtonPropertyBrowserPrivate::propertyInserted(int moduleId, QtBrowse
     m_indexToItem[index] = newItem;
 
     updateItem(newItem);
+    return newItem;
 }
 
 void VistleButtonPropertyBrowserPrivate::propertyRemoved(QtBrowserItem *index)
@@ -545,7 +560,8 @@ VistleButtonPropertyBrowser::~VistleButtonPropertyBrowser()
 */
 void VistleButtonPropertyBrowser::itemInserted(QtBrowserItem *item, QtBrowserItem *afterItem)
 {
-    d_ptr->propertyInserted(m_moduleId, item, afterItem);
+    auto newItem = d_ptr->propertyInserted(m_moduleId, item, afterItem);
+    connect(newItem->label, SIGNAL(highlightModule(int)), this, SIGNAL(highlightModule(int)));
 }
 
 /*!
@@ -590,6 +606,17 @@ bool VistleButtonPropertyBrowser::isExpanded(QtBrowserItem *item) const
         return itm->expanded;
     return false;
 }
+
+void VistleButtonPropertyBrowser::parametersConnected(int fromId, QString fromName, int toId, QString toName)
+{
+    if(m_moduleId != fromId && m_moduleId != toId)
+        return;
+    if(m_moduleId == fromId)
+        d_ptr->parametersConnected(fromId, fromName, toId, toName);
+    else
+        d_ptr->parametersConnected(toId, toName, fromId, fromName);
+}
+
 
 #if QT_VERSION >= 0x040400
 QT_END_NAMESPACE

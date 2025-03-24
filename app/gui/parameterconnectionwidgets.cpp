@@ -10,33 +10,39 @@
 
 using namespace gui;
 
-ParameterConnectionBtn::ParameterConnectionBtn(int moduleId, const QString &paramName, QWidget *parent)
-: QPushButton("...", parent), m_moduleId(moduleId), m_paramName(paramName)
-{}
-
-void ParameterConnectionBtn::mousePressEvent(QMouseEvent *event)
+QString gui::displayName(QString parameterName)
 {
-    if (event->button() == Qt::LeftButton) {
-        QDrag *drag = new QDrag(this);
-        QMimeData *mimeData = new QMimeData;
-
-        // Set the MIME data
-        mimeData->setText(QString("Module ID: %1\nParameter Name: %2\n").arg(m_moduleId).arg(m_paramName));
-        QByteArray encodedData;
-        QDataStream stream(&encodedData, QIODevice::WriteOnly);
-        stream << m_moduleId << m_paramName;
-        mimeData->setData(Parameters::mimeFormat(), encodedData);
-        drag->setMimeData(mimeData);
-
-        // Start the drag event
-        drag->exec(Qt::CopyAction | Qt::MoveAction);
-    }
-    QPushButton::mousePressEvent(event);
+    return parameterName.replace("_", " ").trimmed();
 }
+
+QString gui::parameterName(QString displayName)
+{
+    return displayName.replace(" ", "_").trimmed();
+}
+
 
 ParameterConnectionLabel::ParameterConnectionLabel(int moduleId, const QString &paramName, QWidget *parent)
 : QLabel(parent), m_moduleId(moduleId), m_paramName(paramName)
 {}
+
+void ParameterConnectionLabel::connectParam(int moduleId, const QString &paramName)
+{
+    if (moduleId == m_moduleId && paramName == m_paramName)
+        return;
+    m_connectedParameters.push_back({moduleId, paramName});
+    setStyleSheet("color: blue; border: 1px solid black; padding: 2px;");
+}
+
+void ParameterConnectionLabel::disconnectParam(int moduleId, const QString &paramName)
+{
+    auto it = std::find_if(
+        m_connectedParameters.begin(), m_connectedParameters.end(),
+        [moduleId, paramName](const Connection &c) { return c.moduleId == moduleId && c.paramName == paramName; });
+    if (it != m_connectedParameters.end())
+        m_connectedParameters.erase(it);
+    if (m_connectedParameters.empty())
+        setStyleSheet("");
+}
 
 void ParameterConnectionLabel::mousePressEvent(QMouseEvent *event)
 {
@@ -48,7 +54,7 @@ void ParameterConnectionLabel::mousePressEvent(QMouseEvent *event)
         mimeData->setText(QString("Module ID: %1\nParameter Name: %2\n").arg(m_moduleId).arg(m_paramName));
         QByteArray encodedData;
         QDataStream stream(&encodedData, QIODevice::WriteOnly);
-        stream << m_moduleId << m_paramName;
+        stream << m_moduleId << parameterName(m_paramName);
         mimeData->setData(Parameters::mimeFormat(), encodedData);
         drag->setMimeData(mimeData);
 
@@ -58,6 +64,47 @@ void ParameterConnectionLabel::mousePressEvent(QMouseEvent *event)
     }
     QLabel::mousePressEvent(event);
 }
+
+void ParameterConnectionLabel::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    if (m_connectedParameters.empty() || event->button() != Qt::LeftButton) {
+        QLabel::mouseReleaseEvent(event);
+        return;
+    }
+    initParameterPopup();
+    QPoint globalPos = mapToGlobal(QPoint(0, height()));
+    m_parameterPopup->move(globalPos);
+    m_parameterPopup->show();
+    QLabel::mouseReleaseEvent(event);
+}
+
+void ParameterConnectionLabel::mouseReleaseEvent(QMouseEvent *event)
+{
+    mouseDoubleClickEvent(event);
+}
+
+void ParameterConnectionLabel::initParameterPopup()
+{
+    if (m_parameterPopup)
+        return;
+    QStringList parameters;
+    for (const auto &c: m_connectedParameters) {
+        parameters << QString("%1: %2").arg(c.moduleId).arg(c.paramName);
+    }
+    m_parameterPopup = new ParameterPopup(parameters);
+    connect(m_parameterPopup, &ParameterPopup::parameterSelected, this, [this](const QString &param) {
+        // Handle parameter button click
+        // vistle::Port from(m_parameterConnectionRequest.moduleId, m_parameterConnectionRequest.paramName.toStdString(),
+        //                   vistle::Port::Type::PARAMETER);
+        // vistle::Port to(m_id, param.toStdString(), vistle::Port::Type::PARAMETER);
+        // vistle::VistleConnection::the().connect(&from, &to);
+        m_parameterPopup->close();
+    });
+    connect(m_parameterPopup, &ParameterPopup::parameterHovered, this,
+            [this](int moduleId, const QString &param) { emit highlightModule(moduleId); });
+    m_parameterPopup->setAttribute(Qt::WA_Hover);
+}
+
 
 QStringList putSystemParamsAtTheEnd(const QStringList &params)
 {
@@ -97,9 +144,32 @@ ParameterPopup::ParameterPopup(const QStringList &parameters, QWidget *parent)
     populateListWidget(m_parameters);
 }
 
+bool ParameterPopup::event(QEvent *event)
+{
+    static QListWidgetItem *lastHoveredItem = nullptr;
+    if (event->type() == QEvent::HoverMove) {
+        QHoverEvent *hoverEvent = static_cast<QHoverEvent *>(event);
+        QPoint listWidgetPos = m_listWidget->mapFrom(this, hoverEvent->pos());
+        QListWidgetItem *item = m_listWidget->itemAt(listWidgetPos);
+        if (item && item != lastHoveredItem) {
+            lastHoveredItem = item;
+            std::cerr << "Hovering over item:" << item->text().toStdString() << std::endl;
+            auto moduleId = item->text().split(":").first().toInt();
+            auto paramName = item->text().split(":").last().trimmed();
+            emit parameterHovered(moduleId, paramName);
+        }
+        if (!item) {
+            lastHoveredItem = nullptr;
+            std::cerr << "Hovering over nothing" << std::endl;
+            emit parameterHovered(-1, "");
+        }
+    }
+    return QWidget::event(event);
+}
+
 void ParameterPopup::setParameters(const QStringList &parameters)
 {
-    m_parameters = parameters;
+    m_parameters = putSystemParamsAtTheEnd(parameters);
     populateListWidget(m_parameters);
 }
 
@@ -118,12 +188,12 @@ void ParameterPopup::populateListWidget(const QStringList &parameters)
 {
     m_listWidget->clear();
     for (const QString &param: parameters) {
-        QListWidgetItem *item = new QListWidgetItem(param, m_listWidget);
+        QListWidgetItem *item = new QListWidgetItem(displayName(param), m_listWidget);
         m_listWidget->addItem(item);
     }
 }
 
 void ParameterPopup::onParameterSelected(QListWidgetItem *item)
 {
-    emit parameterSelected(item->text());
+    emit parameterSelected(parameterName(item->text()));
 }

@@ -9,38 +9,41 @@
 #include <QLineEdit>
 #include <QLabel>
 #include <QListWidget>
-
+#include <vector>
 #include "qtpropertybrowser.h"
 namespace gui {
 
-class ParameterConnectionBtn: public QPushButton {
-    Q_OBJECT
+QString displayName(QString parameterName);
 
-public:
-    ParameterConnectionBtn(int moduleId, const QString &paramName, QWidget *parent = nullptr);
+QString parameterName(QString displayName);
 
-protected:
-    void mousePressEvent(QMouseEvent *event) override;
-
-
-private:
-    int m_moduleId;
-    QString m_paramName;
-};
-
+class ParameterPopup;
 class ParameterConnectionLabel: public QLabel {
     Q_OBJECT
 
 public:
     ParameterConnectionLabel(int moduleId, const QString &paramName, QWidget *parent = nullptr);
+    void connectParam(int moduleId, const QString &paramName);
+    void disconnectParam(int moduleId, const QString &paramName);
 
+signals:
+    void highlightModule(int moduleId); //sends -1 if no module is to be highlighted
 protected:
     void mousePressEvent(QMouseEvent *event) override;
-
+    void mouseReleaseEvent(QMouseEvent *ev) override;
+    void mouseDoubleClickEvent(QMouseEvent *event);
 
 private:
     int m_moduleId;
     QString m_paramName;
+    struct Connection {
+        int moduleId;
+        QString paramName;
+    };
+    std::vector<Connection> m_connectedParameters;
+    ParameterPopup *m_parameterPopup = nullptr;
+
+    void initParameterPopup();
 };
 
 class ParameterPopup: public QWidget {
@@ -51,6 +54,7 @@ public:
     void setParameters(const QStringList &parameters);
 signals:
     void parameterSelected(const QString &param);
+    void parameterHovered(int moduleId, const QString &param);
 
 private slots:
     void filterParameters(const QString &query);
@@ -58,6 +62,7 @@ private slots:
 
 private:
     void populateListWidget(const QStringList &parameters);
+    bool event(QEvent *event) override;
 
     QStringList m_parameters;
     QListWidget *m_listWidget;

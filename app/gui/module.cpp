@@ -72,6 +72,7 @@ Module::Module(QGraphicsItem *parent, QString name)
     setLayer(m_layer);
 
     connect(this, &Module::callshowErrorInMainThread, this, &Module::showError);
+    connect(scene(), &DataFlowNetwork::highlightModule, this, &Module::highlightModule);
 }
 
 Module::~Module()
@@ -216,6 +217,13 @@ void Module::showError()
 {
     setStatus(m_Status);
     doLayout();
+}
+
+void Module::highlightModule(int moduleId)
+{
+    m_id == moduleId ? m_borderColor = m_borderColorHighlight : m_borderColor = m_statusBorderColor;
+    update();
+    std::cerr << "highlighting module " << m_id << std::endl;
 }
 
 
@@ -1071,7 +1079,6 @@ void Module::setStatus(Module::Status status)
         m_borderColor = Qt::black;
         break;
     }
-
     if (m_errorState && m_Status != CRASHED) {
         m_borderColor = Qt::red;
     }
@@ -1091,6 +1098,7 @@ void Module::setStatus(Module::Status status)
         m_tooltip = toolTip;
     }
 
+    m_statusBorderColor = m_borderColor;
     update();
 }
 

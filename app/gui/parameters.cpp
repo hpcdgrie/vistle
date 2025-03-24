@@ -40,11 +40,6 @@ namespace gui {
 
 const int NumDec = 15;
 
-static QString displayName(QString parameterName)
-{
-    return parameterName.replace("_", " ").trimmed();
-}
-
 template<class M>
 static M *addPropertyManager(Parameters *p)
 {
@@ -137,6 +132,8 @@ void Parameters::setVistleObserver(VistleObserver *observer)
     connect(observer, SIGNAL(parameterValueChanged_s(int, QString)), this, SLOT(parameterValueChanged(int, QString)));
     connect(observer, SIGNAL(parameterChoicesChanged_s(int, QString)), this,
             SLOT(parameterChoicesChanged(int, QString)));
+    connect(observer, SIGNAL(newConnection_s(int, QString, int, QString)), this,
+            SLOT(newConnection(int, QString, int, QString)));
 }
 
 void Parameters::setVistleConnection(vistle::VistleConnection *conn)
@@ -159,8 +156,15 @@ void Parameters::setModule(int id)
     //std::cerr << "Parameters: showing for " << id << std::endl;
     if (m_vistle) {
         auto params = m_vistle->getParameters(id);
-        for (auto &p: params)
+        for (auto &p: params) {
             newParameter(id, QString::fromStdString(p));
+            auto vistleParam = m_vistle->getParameter(id, p);
+            auto connectedParams = m_vistle->ui().state().getConnectedParameters(*vistleParam);
+            for (const auto &c: connectedParams) {
+                parametersConnected(id, displayName(QString::fromStdString(p)), c->module(),
+                                    displayName(QString::fromStdString(c->getName())));
+            }
+        }
     }
 }
 
@@ -218,56 +222,6 @@ const char *Parameters::mimeFormat()
 {
     return "applicatio1n/x-parameterbrowser";
 }
-
-// QWidget *Parameters::createEditor(QtProperty *property, QWidget *parent)
-// {
-//     QWidget *fullEditor = new QWidget(parent);
-//     auto editor = QtAbstractPropertyBrowser::createEditor(property, fullEditor);
-//     if (!editor) {
-//         delete fullEditor;
-//         return nullptr;
-//     }
-//     auto button = new ParameterConnectionBtn(m_moduleId, property->propertyName(), fullEditor);
-//     button->setFixedWidth(20);
-//     QHBoxLayout *layout = new QHBoxLayout(fullEditor);
-//     layout->addWidget(button);
-//     layout->addWidget(editor);
-//     layout->setContentsMargins(0, 0, 0, 0);
-//     fullEditor->setLayout(layout);
-
-//     return fullEditor;
-// }
-
-// void Parameters::itemChanged(QtBrowserItem *item)
-// {
-//     updateItem(item);
-// }
-
-// void Parameters::itemInserted(QtBrowserItem *item, QtBrowserItem *afterItem)
-// {
-//     updateItem(item);
-// }
-
-// void Parameters::itemRemoved(QtBrowserItem *item)
-// {}
-
-// void Parameters::updateItem(QtBrowserItem *item)
-// {
-//     QtProperty *property = item->property();
-//     QWidget *editor = createEditor(property, this);
-//     if (editor) {
-//         // Replace the label with a button
-//         QPushButton *button = new QPushButton(property->propertyName(), this);
-//         connect(button, &QPushButton::clicked, this, [property]() {
-//             // Handle button click
-//             qDebug() << "Button clicked for property:" << property->propertyName();
-//         });
-
-//         // Set the button as the widget for the property name
-//         setItemWidget(item, 0, button);
-//     }
-// }
-
 
 void Parameters::newParameter(int moduleId, QString parameterName)
 {
@@ -386,6 +340,18 @@ void Parameters::newParameter(int moduleId, QString parameterName)
 
     m_ignorePropertyChanges = false;
 }
+
+void Parameters::newConnection(int fromId, QString fromName, int toId, QString toName)
+{
+    // if(m_moduleId != fromId && m_moduleId != toId)
+    //     return;
+    // const auto it = m_paramToProp.find(m_moduleId == fromId ? fromName : toName);
+    // assert(it != m_paramToProp.end());
+    // QtProperty *prop = it->second;
+    // getProperty
+    parametersConnected(fromId, displayName(fromName), toId, displayName(toName));
+}
+
 
 void Parameters::deleteParameter(int moduleId, QString parameterName)
 {
