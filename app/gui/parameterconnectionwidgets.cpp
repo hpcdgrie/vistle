@@ -153,14 +153,12 @@ bool ParameterPopup::event(QEvent *event)
         QListWidgetItem *item = m_listWidget->itemAt(listWidgetPos);
         if (item && item != lastHoveredItem) {
             lastHoveredItem = item;
-            std::cerr << "Hovering over item:" << item->text().toStdString() << std::endl;
             auto moduleId = item->text().split(":").first().toInt();
             auto paramName = item->text().split(":").last().trimmed();
             emit parameterHovered(moduleId, paramName);
         }
         if (!item) {
             lastHoveredItem = nullptr;
-            std::cerr << "Hovering over nothing" << std::endl;
             emit parameterHovered(-1, "");
         }
     }

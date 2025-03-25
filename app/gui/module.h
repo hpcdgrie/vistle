@@ -36,7 +36,7 @@ class Module: public QObject, public QGraphicsRectItem {
     static bool s_snapToGrid;
 
 public:
-    enum Status { SPAWNING, INITIALIZED, KILLED, BUSY, EXECUTING, ERROR_STATUS, CRASHED };
+    enum Status { SPAWNING, INITIALIZED, KILLED, BUSY, EXECUTING, ERROR_STATUS, CRASHED, HIGHLIGHTED };
 
     struct Message {
         int type;
@@ -196,8 +196,7 @@ private:
     qreal m_fontHeight;
     std::map<vistle::Port, Port *> m_vistleToGui;
 
-    QColor m_borderColor, m_statusBorderColor;
-    QColor m_borderColorHighlight = Qt::darkMagenta;
+    QColor m_borderColor;
 };
 
 template<class T>

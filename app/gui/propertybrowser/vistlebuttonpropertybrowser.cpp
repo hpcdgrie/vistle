@@ -561,7 +561,9 @@ VistleButtonPropertyBrowser::~VistleButtonPropertyBrowser()
 void VistleButtonPropertyBrowser::itemInserted(QtBrowserItem *item, QtBrowserItem *afterItem)
 {
     auto newItem = d_ptr->propertyInserted(m_moduleId, item, afterItem);
-    connect(newItem->label, SIGNAL(highlightModule(int)), this, SIGNAL(highlightModule(int)));
+    auto label = dynamic_cast<gui::ParameterConnectionLabel*>(newItem->label);
+    if(label)
+        connect(label, SIGNAL(highlightModule(int)), this, SIGNAL(highlightModule(int)));
 }
 
 /*!

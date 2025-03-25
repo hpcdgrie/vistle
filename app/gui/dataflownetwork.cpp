@@ -132,6 +132,7 @@ Module *DataFlowNetwork::newModule(QString modName)
     connect(module, &Module::visibleChanged, this, &DataFlowNetwork::updateConnectionVisibility);
     connect(module, &Module::outputStreamingChanged,
             [this, module](bool enable) { emit toggleOutputStreaming(module->id(), enable); });
+    connect(this, &DataFlowNetwork::highlightModule, module, &Module::highlightModule);
     return module;
 }
 

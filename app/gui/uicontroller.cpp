@@ -134,7 +134,7 @@ UiController::UiController(int argc, char *argv[], QObject *parent): QObject(par
     m_mainWindow->dataFlowView()->addToToolBar(m_mainWindow->toolBar(), m_mainWindow->layerWidgetPosition());
     connect(m_mainWindow->dataFlowView(), SIGNAL(executeDataFlow()), SLOT(executeDataFlowNetwork()));
     connect(m_mainWindow->dataFlowView(), SIGNAL(visibleLayerChanged(int)), m_scene, SLOT(visibleLayerChanged(int)));
-    connect(m_mainWindow->parameters(), SIGNAL(highlightModule(int)), m_scene, SLOT(highlightModule(int)));
+    connect(m_mainWindow->parameters(), &Parameters::highlightModule, m_scene, &DataFlowNetwork::highlightModule);
 
     connect(m_mainWindow, SIGNAL(quitRequested(bool &)), SLOT(quitRequested(bool &)));
     connect(m_mainWindow, SIGNAL(newDataFlow()), SLOT(clearDataFlowNetwork()));

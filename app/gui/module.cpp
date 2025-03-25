@@ -72,7 +72,6 @@ Module::Module(QGraphicsItem *parent, QString name)
     setLayer(m_layer);
 
     connect(this, &Module::callshowErrorInMainThread, this, &Module::showError);
-    connect(scene(), &DataFlowNetwork::highlightModule, this, &Module::highlightModule);
 }
 
 Module::~Module()
@@ -221,9 +220,15 @@ void Module::showError()
 
 void Module::highlightModule(int moduleId)
 {
-    m_id == moduleId ? m_borderColor = m_borderColorHighlight : m_borderColor = m_statusBorderColor;
-    update();
-    std::cerr << "highlighting module " << m_id << std::endl;
+    if (moduleId == m_id) {
+        m_StatusBeforeHighlight = m_Status;
+        m_Status = HIGHLIGHTED;
+        if (scene())
+            m_borderColor = scene()->highlightColor();
+        update();
+    } else {
+        setStatus(m_StatusBeforeHighlight);
+    }
 }
 
 
@@ -1026,7 +1031,7 @@ QPointF Module::portPos(const Port *port) const
 void Module::setStatus(Module::Status status)
 {
     m_Status = status;
-
+    m_StatusBeforeHighlight = status;
     QString toolTip = "Unknown";
 
     switch (m_Status) {
@@ -1077,6 +1082,12 @@ void Module::setStatus(Module::Status status)
         toolTip = "Crashed";
         m_color = Qt::darkGray;
         m_borderColor = Qt::black;
+        break;
+    case HIGHLIGHTED:
+        m_borderColor = Qt::gray;
+        if (scene()) {
+            m_borderColor = scene()->highlightColor();
+        }
         break;
     }
     if (m_errorState && m_Status != CRASHED) {
