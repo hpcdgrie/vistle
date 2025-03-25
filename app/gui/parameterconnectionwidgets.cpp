@@ -92,17 +92,35 @@ void ParameterConnectionLabel::initParameterPopup()
         parameters << QString("%1: %2").arg(c.moduleId).arg(c.paramName);
     }
     m_parameterPopup = new ParameterPopup(parameters);
-    connect(m_parameterPopup, &ParameterPopup::parameterSelected, this, [this](const QString &param) {
-        // Handle parameter button click
-        // vistle::Port from(m_parameterConnectionRequest.moduleId, m_parameterConnectionRequest.paramName.toStdString(),
-        //                   vistle::Port::Type::PARAMETER);
-        // vistle::Port to(m_id, param.toStdString(), vistle::Port::Type::PARAMETER);
-        // vistle::VistleConnection::the().connect(&from, &to);
-        m_parameterPopup->close();
-    });
+    m_parameterPopup->enableXBtn(true);
+    connect(m_parameterPopup, &ParameterPopup::parameterSelected, this,
+            [this](const QString &param) { m_parameterPopup->close(); });
     connect(m_parameterPopup, &ParameterPopup::parameterHovered, this,
             [this](int moduleId, const QString &param) { emit highlightModule(moduleId); });
+    connect(m_parameterPopup, &ParameterPopup::parameterDisconnected, this, [this](int moduleId, const QString &param) {
+        emit disconnectParameters(m_moduleId, parameterName(m_paramName), moduleId, param);
+    });
     m_parameterPopup->setAttribute(Qt::WA_Hover);
+}
+
+
+ParameterListItemWithX::ParameterListItemWithX(const QString &text, QWidget *parent): QWidget(parent), m_text(text)
+{
+    QHBoxLayout *layout = new QHBoxLayout(this);
+    m_label = new QLabel(this);
+    m_removeButton = new QPushButton("X", this);
+
+    layout->addWidget(m_label);
+    layout->addWidget(m_removeButton);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(5);
+
+    connect(m_removeButton, &QPushButton::clicked, this, &ParameterListItemWithX::onRemoveButtonClicked);
+}
+
+void ParameterListItemWithX::onRemoveButtonClicked()
+{
+    emit removeRequested(m_text);
 }
 
 
@@ -168,8 +186,16 @@ bool ParameterPopup::event(QEvent *event)
 void ParameterPopup::setParameters(const QStringList &parameters)
 {
     m_parameters = putSystemParamsAtTheEnd(parameters);
-    populateListWidget(m_parameters);
+    (this->*populateFnc)(m_parameters);
 }
+
+void ParameterPopup::enableXBtn(bool enable)
+{
+    enable ? populateFnc = &ParameterPopup::populateListWidgetWithXBtn
+           : populateFnc = &ParameterPopup::populateListWidget;
+    (this->*populateFnc)(m_parameters);
+}
+
 
 void ParameterPopup::filterParameters(const QString &query)
 {
@@ -179,7 +205,7 @@ void ParameterPopup::filterParameters(const QString &query)
             filteredParameters << param;
         }
     }
-    populateListWidget(filteredParameters);
+    (this->*populateFnc)(filteredParameters);
 }
 
 void ParameterPopup::populateListWidget(const QStringList &parameters)
@@ -188,6 +214,30 @@ void ParameterPopup::populateListWidget(const QStringList &parameters)
     for (const QString &param: parameters) {
         QListWidgetItem *item = new QListWidgetItem(displayName(param), m_listWidget);
         m_listWidget->addItem(item);
+    }
+}
+void ParameterPopup::populateListWidgetWithXBtn(const QStringList &parameters)
+{
+    m_listWidget->clear();
+    for (const QString &param: parameters) {
+        QListWidgetItem *item = new QListWidgetItem(displayName(param), m_listWidget);
+        ParameterListItemWithX *widgetItem = new ParameterListItemWithX(displayName(param), m_listWidget);
+        connect(widgetItem, &ParameterListItemWithX::removeRequested, this, [this](const QString &text) {
+            // Remove the item from the list
+            for (int i = 0; i < m_listWidget->count(); ++i) {
+                QListWidgetItem *item = m_listWidget->item(i);
+                if (item->text() == text) {
+                    delete m_listWidget->takeItem(i);
+                    break;
+                }
+            }
+            auto moduleId = text.split(":").first().toInt();
+            auto paramName = text.split(":").last().trimmed();
+            std::cerr << "disconnecting " << moduleId << ", " << paramName.toStdString() << std::endl;
+            emit parameterDisconnected(moduleId, parameterName(paramName));
+        });
+        item->setSizeHint(widgetItem->sizeHint());
+        m_listWidget->setItemWidget(item, widgetItem);
     }
 }
 

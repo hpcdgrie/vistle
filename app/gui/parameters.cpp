@@ -134,6 +134,8 @@ void Parameters::setVistleObserver(VistleObserver *observer)
             SLOT(parameterChoicesChanged(int, QString)));
     connect(observer, SIGNAL(newConnection_s(int, QString, int, QString)), this,
             SLOT(newConnection(int, QString, int, QString)));
+    connect(observer, SIGNAL(deleteConnection_s(int, QString, int, QString)), this,
+            SLOT(deleteConnection(int, QString, int, QString)));
 }
 
 void Parameters::setVistleConnection(vistle::VistleConnection *conn)
@@ -343,15 +345,13 @@ void Parameters::newParameter(int moduleId, QString parameterName)
 
 void Parameters::newConnection(int fromId, QString fromName, int toId, QString toName)
 {
-    // if(m_moduleId != fromId && m_moduleId != toId)
-    //     return;
-    // const auto it = m_paramToProp.find(m_moduleId == fromId ? fromName : toName);
-    // assert(it != m_paramToProp.end());
-    // QtProperty *prop = it->second;
-    // getProperty
     parametersConnected(fromId, displayName(fromName), toId, displayName(toName));
 }
 
+void Parameters::deleteConnection(int fromId, QString fromName, int toId, QString toName)
+{
+    parametersDisconnected(fromId, displayName(fromName), toId, displayName(toName));
+}
 
 void Parameters::deleteParameter(int moduleId, QString parameterName)
 {

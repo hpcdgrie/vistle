@@ -47,6 +47,7 @@ struct WidgetItem
     void slotUpdate();
     void slotToggled(bool checked);
     void parametersConnected(int fromId, QString fromName, int toId, QString toName);
+    void parametersDisconnected(int fromId, QString fromName, int toId, QString toName);
 
 private:
     void updateLater();
@@ -212,6 +213,16 @@ void VistleButtonPropertyBrowserPrivate::parametersConnected(int fromId, QString
         if(item->label && item->label->text() == fromName) {
             if(auto paramLabel = dynamic_cast<gui::ParameterConnectionLabel*>(item->label))
                 paramLabel->connectParam(toId, toName);
+        }
+    }
+}
+
+void VistleButtonPropertyBrowserPrivate::parametersDisconnected(int fromId, QString fromName, int toId, QString toName)
+{
+    for(auto item : m_indexToItem) {
+        if(item->label && item->label->text() == fromName) {
+            if(auto paramLabel = dynamic_cast<gui::ParameterConnectionLabel*>(item->label))
+                paramLabel->disconnectParam(toId, toName);
         }
     }
 }
@@ -563,7 +574,13 @@ void VistleButtonPropertyBrowser::itemInserted(QtBrowserItem *item, QtBrowserIte
     auto newItem = d_ptr->propertyInserted(m_moduleId, item, afterItem);
     auto label = dynamic_cast<gui::ParameterConnectionLabel*>(newItem->label);
     if(label)
-        connect(label, SIGNAL(highlightModule(int)), this, SIGNAL(highlightModule(int)));
+    {
+        connect(label, &gui::ParameterConnectionLabel::highlightModule, this, &VistleButtonPropertyBrowser::highlightModule);
+        connect(label, &gui::ParameterConnectionLabel::disconnectParameters, this, [this](int fromId, const QString &fromName, int toId, const QString &toName) {
+            emit disconnectParameters(fromId, fromName, toId, toName);
+        });
+
+    }
 }
 
 /*!
@@ -617,6 +634,16 @@ void VistleButtonPropertyBrowser::parametersConnected(int fromId, QString fromNa
         d_ptr->parametersConnected(fromId, fromName, toId, toName);
     else
         d_ptr->parametersConnected(toId, toName, fromId, fromName);
+}
+
+void VistleButtonPropertyBrowser::parametersDisconnected(int fromId, QString fromName, int toId, QString toName)
+{
+    if(m_moduleId != fromId && m_moduleId != toId)
+        return;
+    if(m_moduleId == fromId)
+        d_ptr->parametersDisconnected(fromId, fromName, toId, toName);
+    else
+        d_ptr->parametersDisconnected(toId, toName, fromId, fromName);
 }
 
 

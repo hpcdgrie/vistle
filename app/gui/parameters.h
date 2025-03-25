@@ -42,6 +42,7 @@ public:
 private slots:
     void newParameter(int moduleId, QString parameterName);
     void newConnection(int fromId, QString fromName, int toId, QString toName);
+    void deleteConnection(int fromId, QString fromName, int toId, QString toName);
     void deleteParameter(int moduleId, QString parameterName);
     void parameterValueChanged(int moduleId, QString parameterName);
     void parameterChoicesChanged(int moduleId, QString parameterName);

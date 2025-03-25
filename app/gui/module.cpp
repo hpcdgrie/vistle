@@ -1109,7 +1109,6 @@ void Module::setStatus(Module::Status status)
         m_tooltip = toolTip;
     }
 
-    m_statusBorderColor = m_borderColor;
     update();
 }
 

@@ -20,7 +20,7 @@ public:
     
     void collapsed(QtBrowserItem *item);
     void expanded(QtBrowserItem *item);
-    void disconnectParameters(int moduleId, QString fromName, QString toName);
+    void disconnectParameters(int fromId, QString fromName, int toId, QString toName);
     void highlightModule(int moduleId);
     
     protected:
@@ -31,6 +31,7 @@ public:
     int m_moduleId = 0;
 protected slots:
     void parametersConnected(int fromId, QString fromName, int toId, QString toName);
+    void parametersDisconnected(int fromId, QString fromName, int toId, QString toName);
 private:
     VistleButtonPropertyBrowserPrivate *d_ptr;
     Q_DECLARE_PRIVATE(VistleButtonPropertyBrowser)
