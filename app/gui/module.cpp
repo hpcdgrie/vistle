@@ -220,13 +220,13 @@ void Module::showError()
 
 void Module::highlightModule(int moduleId)
 {
-    if (moduleId == m_id) {
+    if (moduleId == m_id && m_Status != HIGHLIGHTED) {
         m_StatusBeforeHighlight = m_Status;
         m_Status = HIGHLIGHTED;
-        if (scene())
-            m_borderColor = scene()->highlightColor();
+        QPalette p;
+        m_borderColor = p.color(QPalette::Active, QPalette::Highlight);
         update();
-    } else {
+    } else if (moduleId == -1) {
         setStatus(m_StatusBeforeHighlight);
     }
 }
@@ -962,9 +962,7 @@ void Module::showParameters(const ParameterConnectionRequest &request)
     auto params = scene()->getModuleParameters(m_id);
     m_parameterPopup->setParameters(params);
     m_parameterConnectionRequest = request;
-    QPointF modulePos = mapToScene(boundingRect().center());
-    QPoint globalPos = scene()->views().first()->mapToGlobal(modulePos.toPoint());
-    m_parameterPopup->move(globalPos);
+    m_parameterPopup->move(request.pos);
     m_parameterPopup->show();
 }
 
@@ -1084,10 +1082,8 @@ void Module::setStatus(Module::Status status)
         m_borderColor = Qt::black;
         break;
     case HIGHLIGHTED:
-        m_borderColor = Qt::gray;
-        if (scene()) {
-            m_borderColor = scene()->highlightColor();
-        }
+        QPalette p;
+        m_borderColor = p.color(QPalette::Active, QPalette::Highlight);
         break;
     }
     if (m_errorState && m_Status != CRASHED) {

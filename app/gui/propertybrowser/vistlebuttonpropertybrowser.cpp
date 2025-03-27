@@ -210,7 +210,7 @@ void VistleButtonPropertyBrowserPrivate::slotToggled(bool checked)
 void VistleButtonPropertyBrowserPrivate::parametersConnected(int fromId, QString fromName, int toId, QString toName)
 {
     for(auto item : m_indexToItem) {
-        if(item->label && item->label->text() == fromName) {
+        if(item->label && item->label->text().endsWith(fromName)) {
             if(auto paramLabel = dynamic_cast<gui::ParameterConnectionLabel*>(item->label))
                 paramLabel->connectParam(toId, toName);
         }
@@ -220,14 +220,12 @@ void VistleButtonPropertyBrowserPrivate::parametersConnected(int fromId, QString
 void VistleButtonPropertyBrowserPrivate::parametersDisconnected(int fromId, QString fromName, int toId, QString toName)
 {
     for(auto item : m_indexToItem) {
-        if(item->label && item->label->text() == fromName) {
+        if(item->label && item->label->text().endsWith(fromName)) {
             if(auto paramLabel = dynamic_cast<gui::ParameterConnectionLabel*>(item->label))
                 paramLabel->disconnectParam(toId, toName);
         }
     }
 }
-
-
 
 void VistleButtonPropertyBrowserPrivate::updateLater()
 {
@@ -461,25 +459,17 @@ void VistleButtonPropertyBrowserPrivate::updateItem(WidgetItem *item)
         QFont font = item->label->font();
         font.setUnderline(property->isModified());
         item->label->setFont(font);
-        item->label->setText(property->propertyName());
+        // item->label->setText(property->propertyName());
         item->label->setToolTip(property->toolTip());
         item->label->setStatusTip(property->statusTip());
         item->label->setWhatsThis(property->whatsThis());
         item->label->setEnabled(property->isEnabled());
-        
-        // item->label->setStyleSheet("QLabel { background-color : red; color : blue; }");
-        // Set the background color of the label
-        // QPalette palette = item->label->palette();
-        // palette.setColor(QPalette::ColorRole::Text, Qt::yellow); // Change to desired color
-        // item->label->setAutoFillBackground(true);
-        // item->label->setPalette(palette);
-
     }
     if (item->widgetLabel) {
         QFont font = item->widgetLabel->font();
         font.setUnderline(false);
         item->widgetLabel->setFont(font);
-        item->widgetLabel->setText(property->valueText() + "_item->widgetLabel");
+        item->widgetLabel->setText(property->valueText());
         item->widgetLabel->setToolTip(property->valueText());
         item->widgetLabel->setEnabled(property->isEnabled());
     }

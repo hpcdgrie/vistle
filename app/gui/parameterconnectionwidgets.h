@@ -3,6 +3,7 @@
 
 #include <QPushButton>
 #include <QString>
+#include <QEvent>
 #include <QMouseEvent>
 #include <QVBoxLayout>
 #include <QScrollArea>
@@ -33,7 +34,7 @@ signals:
 protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *ev) override;
-    void mouseDoubleClickEvent(QMouseEvent *event);
+    bool event(QEvent *event) override;
 
 private:
     int m_moduleId;
@@ -43,8 +44,8 @@ private:
         QString paramName;
     };
     std::vector<Connection> m_connectedParameters;
-    ParameterPopup *m_parameterPopup = nullptr;
-
+    std::unique_ptr<ParameterPopup> m_parameterPopup;
+    bool m_pressed = false;
     void initParameterPopup();
 };
 

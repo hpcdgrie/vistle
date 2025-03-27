@@ -45,6 +45,7 @@ public:
     struct ParameterConnectionRequest {
         int moduleId;
         QString paramName;
+        QPoint pos;
     };
 
     Module(QGraphicsItem *parent = nullptr, QString name = QString());
