@@ -21,7 +21,7 @@
 namespace gui {
 class Connection;
 class DataFlowNetwork;
-class ParameterPopupBase;
+class ParameterPopup;
 
 const bool LayersAsOpacity = true;
 
@@ -170,7 +170,7 @@ private:
     QAction *m_cloneModuleLinked = nullptr;
     QMenu *m_layerMenu = nullptr;
     QMenu *m_advancedMenu = nullptr;
-    ParameterPopupBase *m_parameterPopup = nullptr;
+    ParameterPopup *m_parameterPopup = nullptr;
     ParameterConnectionRequest m_parameterConnectionRequest;
 
     int m_hub;

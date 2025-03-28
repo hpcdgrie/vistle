@@ -18,7 +18,58 @@ QString displayName(QString parameterName);
 
 QString parameterName(QString displayName);
 
-class ParameterPopup;
+
+class ParameterPopup: public QWidget {
+    Q_OBJECT
+public:
+    ParameterPopup(const QStringList &parameters);
+    void setParameters(const QStringList &parameters);
+signals:
+    void parameterSelected(const QString &param);
+
+protected:
+    virtual void populateListWidget(const QStringList &parameters);
+    QStringList m_parameters;
+    QListWidget *m_listWidget;
+
+private:
+    QLineEdit *m_searchField;
+};
+
+class ParameterPopupWithBtn: public ParameterPopup {
+    Q_OBJECT
+public:
+    ParameterPopupWithBtn(const QStringList &parameters, std::vector<bool> withBtn);
+    void setButtons(const std::vector<bool> &withBtn);
+signals:
+    void parameterSelected(const QString &param);
+    void parameterHovered(int moduleId, const QString &param);
+    void parameterDisconnected(int moduleId, const QString &param);
+
+private:
+    void populateListWidget(const QStringList &parameters) override;
+
+    std::vector<bool> m_withBtn;
+};
+
+class ParameterListItemWithX: public QWidget {
+    Q_OBJECT
+
+public:
+    ParameterListItemWithX(const QString &text, QWidget *parent = nullptr);
+
+signals:
+    void disconnectRequested(const QString &text);
+
+private slots:
+    void onDisconnectButtonClicked();
+
+private:
+    QLabel *m_label;
+    QPushButton *m_removeButton;
+    QString m_text;
+};
+
 class ParameterConnectionLabel: public QLabel {
     Q_OBJECT
 
@@ -45,83 +96,10 @@ private:
         bool direct;
     };
     std::vector<Connection> m_connectedParameters;
-    std::unique_ptr<ParameterPopup> m_parameterPopup;
+    std::unique_ptr<ParameterPopupWithBtn> m_parameterPopup;
     bool m_pressed = false;
     void initParameterPopup();
     void redrawParameterPopup();
-};
-
-class ParameterListItemWithX: public QWidget {
-    Q_OBJECT
-
-public:
-    ParameterListItemWithX(const QString &text, QWidget *parent = nullptr);
-
-signals:
-    void disconnectRequested(const QString &text);
-
-private slots:
-    void onDisconnectButtonClicked();
-
-private:
-    QLabel *m_label;
-    QPushButton *m_removeButton;
-    QString m_text;
-};
-
-class ParameterPopupBase: public QWidget {
-    Q_OBJECT
-public:
-    ParameterPopupBase(const QStringList &parameters);
-    void setParameters(const QStringList &parameters);
-signals:
-    void parameterSelected(const QString &param);
-
-protected:
-    virtual void populateListWidget(const QStringList &parameters);
-
-private:
-    QStringList m_parameters;
-    QListWidget *m_listWidget;
-    QLineEdit *m_searchField;
-};
-
-class ParameterPopup: public QWidget {
-    Q_OBJECT
-
-public:
-    struct Entry {
-        QString text;
-        bool withBtn;
-    };
-    ParameterPopup(const std::vector<Entry> &parameters, QWidget *parent = nullptr);
-    void setParameters(const std::vector<Entry> &parameters);
-
-signals:
-    void parameterSelected(const QString &param);
-    void parameterHovered(int moduleId, const QString &param);
-    void parameterDisconnected(int moduleId, const QString &param);
-
-private slots:
-    void filterParameters(const QString &query);
-    void onParameterSelected(QListWidgetItem *item);
-
-private:
-    //used for the drop area
-    void populateListWidget(const std::vector<Entry> &parameters);
-    //used in the parameter editor
-    void populateListWidgetWithXBtn(const std::vector<Entry> &parameters);
-    bool event(QEvent *event) override;
-
-    std::vector<Entry> m_parameters;
-    QListWidget *m_listWidget;
-    QLineEdit *m_searchField;
-    void (ParameterPopup::*populateFnc)(const std::vector<Entry> &parameters) = &ParameterPopup::populateListWidget;
-};
-
-class VistleAbstractPropertyManager: public QtAbstractPropertyManager {
-    Q_OBJECT
-    // QtProperty *createProperty() override;
 };
 
 } // namespace gui
