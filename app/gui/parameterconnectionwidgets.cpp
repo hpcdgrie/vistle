@@ -207,6 +207,72 @@ std::vector<ParameterPopup::Entry> putSystemParamsAtTheEnd(const std::vector<Par
     return parameters;
 }
 
+QStringList filterParameters(const QStringList &parameters, const QString &query)
+{
+    QStringList filteredParameters;
+    for (const auto &param: parameters) {
+        if (param.contains(query, Qt::CaseInsensitive)) {
+            filteredParameters.push_back(param);
+        }
+    }
+    return filteredParameters;
+}
+
+ParameterPopupBase::ParameterPopupBase(const QStringList &parameters)
+: QWidget(nullptr, Qt::Popup), m_parameters(parameters)
+{
+    QVBoxLayout *layout = new QVBoxLayout(this);
+
+    // Add search field
+    m_searchField = new QLineEdit(this);
+    m_searchField->setPlaceholderText("Search...");
+    layout->addWidget(m_searchField);
+    connect(m_searchField, &QLineEdit::textChanged, this,
+            [this](const QString &query) { populateListWidget(filterParameters(m_parameters, query)); });
+
+    // Add list widget
+    m_listWidget = new QListWidget(this);
+    layout->addWidget(m_listWidget);
+    connect(m_listWidget, &QListWidget::itemClicked, this,
+            [this](QListWidgetItem *item) { emit parameterSelected(parameterName(item->text())); });
+
+    setLayout(layout);
+    setMaximumHeight(300); // Set the maximum height for the popup
+
+    populateListWidget(m_parameters);
+}
+
+QStringList putSystemParamsAtTheEnd(const QStringList &params)
+{
+    auto parameters = params;
+    std::sort(parameters.begin(), parameters.end(), [](const QString &a, const QString &b) {
+        if (a.startsWith('_') && !b.startsWith('_')) {
+            return false;
+        }
+        if (!a.startsWith('_') && b.startsWith('_')) {
+            return true;
+        }
+        return a < b;
+    });
+    return parameters;
+}
+
+void ParameterPopupBase::setParameters(const QStringList &parameters)
+{
+    m_parameters = putSystemParamsAtTheEnd(parameters);
+    populateListWidget(m_parameters);
+}
+
+void ParameterPopupBase::populateListWidget(const QStringList &parameters)
+{
+    m_listWidget->clear();
+
+    for (const auto &param: parameters) {
+        QListWidgetItem *item = new QListWidgetItem(displayName(param), m_listWidget);
+        m_listWidget->addItem(item);
+    }
+}
+
 ParameterPopup::ParameterPopup(const std::vector<Entry> &parameters, QWidget *parent)
 : QWidget(parent, Qt::Popup), m_parameters(parameters)
 {
@@ -221,7 +287,8 @@ ParameterPopup::ParameterPopup(const std::vector<Entry> &parameters, QWidget *pa
     // Add list widget
     m_listWidget = new QListWidget(this);
     layout->addWidget(m_listWidget);
-    connect(m_listWidget, &QListWidget::itemClicked, this, &ParameterPopup::onParameterSelected);
+    connect(m_listWidget, &QListWidget::itemClicked, this,
+            [this](QListWidgetItem *item) { emit parameterSelected(parameterName(item->text())); });
 
     setLayout(layout);
     setMaximumHeight(300); // Set the maximum height for the popup

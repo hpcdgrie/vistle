@@ -69,6 +69,23 @@ private:
     QString m_text;
 };
 
+class ParameterPopupBase: public QWidget {
+    Q_OBJECT
+public:
+    ParameterPopupBase(const QStringList &parameters);
+    void setParameters(const QStringList &parameters);
+signals:
+    void parameterSelected(const QString &param);
+
+protected:
+    virtual void populateListWidget(const QStringList &parameters);
+
+private:
+    QStringList m_parameters;
+    QListWidget *m_listWidget;
+    QLineEdit *m_searchField;
+};
+
 class ParameterPopup: public QWidget {
     Q_OBJECT
 
