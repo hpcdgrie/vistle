@@ -946,7 +946,7 @@ QColor Module::hubColor(int hub)
 
 void Module::createParameterPopup()
 {
-    m_parameterPopup = new ParameterPopup(QStringList{});
+    m_parameterPopup = new ParameterPopup(std::vector<ParameterPopup::Entry>{});
     connect(m_parameterPopup, &ParameterPopup::parameterSelected, this, [this](const QString &param) {
         // Handle parameter button click
         vistle::Port from(m_parameterConnectionRequest.moduleId, m_parameterConnectionRequest.paramName.toStdString(),
@@ -960,7 +960,11 @@ void Module::createParameterPopup()
 void Module::showParameters(const ParameterConnectionRequest &request)
 {
     auto params = scene()->getModuleParameters(m_id);
-    m_parameterPopup->setParameters(params);
+    std::vector<ParameterPopup::Entry> entries;
+    for (const auto &param: params) {
+        entries.push_back({param, false});
+    }
+    m_parameterPopup->setParameters(entries);
     m_parameterConnectionRequest = request;
     m_parameterPopup->move(request.pos);
     m_parameterPopup->show();

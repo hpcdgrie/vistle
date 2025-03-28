@@ -132,10 +132,8 @@ void Parameters::setVistleObserver(VistleObserver *observer)
     connect(observer, SIGNAL(parameterValueChanged_s(int, QString)), this, SLOT(parameterValueChanged(int, QString)));
     connect(observer, SIGNAL(parameterChoicesChanged_s(int, QString)), this,
             SLOT(parameterChoicesChanged(int, QString)));
-    connect(observer, SIGNAL(newConnection_s(int, QString, int, QString)), this,
-            SLOT(newConnection(int, QString, int, QString)));
-    connect(observer, SIGNAL(deleteConnection_s(int, QString, int, QString)), this,
-            SLOT(deleteConnection(int, QString, int, QString)));
+    connect(observer, &VistleObserver::newConnection_s, this, &Parameters::setConnectedParameters);
+    connect(observer, &VistleObserver::deleteConnection_s, this, &Parameters::setConnectedParameters);
 }
 
 void Parameters::setVistleConnection(vistle::VistleConnection *conn)
@@ -154,20 +152,35 @@ void Parameters::setModule(int id)
     m_propToGroup.clear();
 
     m_moduleId = id;
-
-    //std::cerr << "Parameters: showing for " << id << std::endl;
     if (m_vistle) {
         auto params = m_vistle->getParameters(id);
-        for (auto &p: params) {
+        for (auto &p: params)
             newParameter(id, QString::fromStdString(p));
-            auto vistleParam = m_vistle->getParameter(id, p);
-            auto connectedParams = m_vistle->ui().state().getConnectedParameters(*vistleParam);
-            for (const auto &c: connectedParams) {
-                parametersConnected(id, displayName(QString::fromStdString(p)), c->module(),
-                                    displayName(QString::fromStdString(c->getName())));
-            }
+    }
+    setConnectedParameters();
+}
+
+void Parameters::setConnectedParameters()
+{
+    //std::cerr << "Parameters: showing for " << id << std::endl;
+    if (!m_vistle)
+        return;
+    auto params = m_vistle->getParameters(m_moduleId);
+    std::vector<Connection> connections;
+    for (auto &p: params) {
+        auto vistleParam = m_vistle->getParameter(m_moduleId, p);
+        auto connectedParams = m_vistle->ui().state().getConnectedParameters(*vistleParam);
+        const auto &portTracker = m_vistle->ui().state().portTracker();
+        const auto port = portTracker->findPort(vistleParam->module(), vistleParam->getName());
+        auto directlyConnectedParams = portTracker->getConnectionList(port);
+        for (const auto &c: connectedParams) {
+            auto direct = directlyConnectedParams->find(portTracker->getPort(c->module(), c->getName())) !=
+                          directlyConnectedParams->end();
+            connections.push_back({m_moduleId, displayName(QString::fromStdString(p)), c->module(),
+                                   displayName(QString::fromStdString(c->getName())), direct});
         }
     }
+    parametersConnected(connections);
 }
 
 QString Parameters::propertyToName(QtProperty *prop) const
@@ -341,16 +354,6 @@ void Parameters::newParameter(int moduleId, QString parameterName)
     parameterValueChanged(moduleId, parameterName);
 
     m_ignorePropertyChanges = false;
-}
-
-void Parameters::newConnection(int fromId, QString fromName, int toId, QString toName)
-{
-    parametersConnected(fromId, displayName(fromName), toId, displayName(toName));
-}
-
-void Parameters::deleteConnection(int fromId, QString fromName, int toId, QString toName)
-{
-    parametersDisconnected(fromId, displayName(fromName), toId, displayName(toName));
 }
 
 void Parameters::deleteParameter(int moduleId, QString parameterName)

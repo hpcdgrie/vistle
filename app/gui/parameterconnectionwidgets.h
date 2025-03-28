@@ -24,9 +24,9 @@ class ParameterConnectionLabel: public QLabel {
 
 public:
     ParameterConnectionLabel(int moduleId, const QString &paramName, QWidget *parent = nullptr);
-    void connectParam(int moduleId, const QString &paramName);
+    void connectParam(int moduleId, const QString &paramName, bool direct);
     void disconnectParam(int moduleId, const QString &paramName);
-
+    void clearConnections();
 signals:
     void highlightModule(int moduleId); //sends -1 if no module is to be highlighted
     void disconnectParameters(int fromId, const QString &fromName, int toId, const QString &toName);
@@ -42,11 +42,13 @@ private:
     struct Connection {
         int moduleId;
         QString paramName;
+        bool direct;
     };
     std::vector<Connection> m_connectedParameters;
     std::unique_ptr<ParameterPopup> m_parameterPopup;
     bool m_pressed = false;
     void initParameterPopup();
+    void redrawParameterPopup();
 };
 
 class ParameterListItemWithX: public QWidget {
@@ -56,10 +58,10 @@ public:
     ParameterListItemWithX(const QString &text, QWidget *parent = nullptr);
 
 signals:
-    void removeRequested(const QString &text);
+    void disconnectRequested(const QString &text);
 
 private slots:
-    void onRemoveButtonClicked();
+    void onDisconnectButtonClicked();
 
 private:
     QLabel *m_label;
@@ -71,9 +73,13 @@ class ParameterPopup: public QWidget {
     Q_OBJECT
 
 public:
-    ParameterPopup(const QStringList &parameters, QWidget *parent = nullptr);
-    void setParameters(const QStringList &parameters);
-    void enableXBtn(bool enable);
+    struct Entry {
+        QString text;
+        bool withBtn;
+    };
+    ParameterPopup(const std::vector<Entry> &parameters, QWidget *parent = nullptr);
+    void setParameters(const std::vector<Entry> &parameters);
+
 signals:
     void parameterSelected(const QString &param);
     void parameterHovered(int moduleId, const QString &param);
@@ -84,14 +90,16 @@ private slots:
     void onParameterSelected(QListWidgetItem *item);
 
 private:
-    void populateListWidget(const QStringList &parameters);
-    void populateListWidgetWithXBtn(const QStringList &parameters);
+    //used for the drop area
+    void populateListWidget(const std::vector<Entry> &parameters);
+    //used in the parameter editor
+    void populateListWidgetWithXBtn(const std::vector<Entry> &parameters);
     bool event(QEvent *event) override;
 
-    QStringList m_parameters;
+    std::vector<Entry> m_parameters;
     QListWidget *m_listWidget;
     QLineEdit *m_searchField;
-    void (ParameterPopup::*populateFnc)(const QStringList &) = &ParameterPopup::populateListWidget;
+    void (ParameterPopup::*populateFnc)(const std::vector<Entry> &parameters) = &ParameterPopup::populateListWidget;
 };
 
 class VistleAbstractPropertyManager: public QtAbstractPropertyManager {

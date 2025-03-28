@@ -63,13 +63,14 @@ ParameterConnectionLabel::ParameterConnectionLabel(int moduleId, const QString &
     setParamText(this, displayName(paramName), false);
 }
 
-void ParameterConnectionLabel::connectParam(int moduleId, const QString &paramName)
+void ParameterConnectionLabel::connectParam(int moduleId, const QString &paramName, bool direct)
 {
     if (moduleId == m_moduleId && paramName == m_paramName)
         return;
-    m_connectedParameters.push_back({moduleId, paramName});
+    m_connectedParameters.push_back({moduleId, paramName, direct});
     // setStyleSheet("color: blue; border: 1px solid black; padding: 2px;");
     setParamText(this, displayName(m_paramName), true);
+    redrawParameterPopup();
 }
 
 void ParameterConnectionLabel::disconnectParam(int moduleId, const QString &paramName)
@@ -81,6 +82,13 @@ void ParameterConnectionLabel::disconnectParam(int moduleId, const QString &para
         m_connectedParameters.erase(it);
     if (m_connectedParameters.empty())
         setParamText(this, displayName(m_paramName), false);
+}
+
+void ParameterConnectionLabel::clearConnections()
+{
+    m_connectedParameters.clear();
+    setParamText(this, displayName(m_paramName), false);
+    redrawParameterPopup();
 }
 
 void ParameterConnectionLabel::mousePressEvent(QMouseEvent *event)
@@ -102,8 +110,6 @@ void ParameterConnectionLabel::mouseReleaseEvent(QMouseEvent *event)
         m_parameterPopup->close();
         return;
     }
-    QPoint globalPos = mapToGlobal(QPoint(0, height()));
-    m_parameterPopup->move(globalPos);
     m_parameterPopup->show();
 }
 
@@ -136,14 +142,14 @@ bool ParameterConnectionLabel::event(QEvent *event)
     return QLabel::event(event);
 }
 
+
 void ParameterConnectionLabel::initParameterPopup()
 {
-    QStringList parameters;
+    std::vector<ParameterPopup::Entry> parameters;
     for (const auto &c: m_connectedParameters) {
-        parameters << QString("%1: %2").arg(c.moduleId).arg(c.paramName);
+        parameters.push_back({QString("%1: %2").arg(c.moduleId).arg(c.paramName), c.direct});
     }
     m_parameterPopup = std::make_unique<ParameterPopup>(parameters);
-    m_parameterPopup->enableXBtn(true);
     connect(m_parameterPopup.get(), &ParameterPopup::parameterSelected, this,
             [this](const QString &param) { m_parameterPopup->close(); });
     connect(m_parameterPopup.get(), &ParameterPopup::parameterHovered, this,
@@ -153,8 +159,18 @@ void ParameterConnectionLabel::initParameterPopup()
                 emit disconnectParameters(m_moduleId, parameterName(m_paramName), moduleId, param);
             });
     m_parameterPopup->setAttribute(Qt::WA_Hover);
+    QPoint globalPos = mapToGlobal(QPoint(0, height()));
+    m_parameterPopup->move(globalPos);
 }
 
+void ParameterConnectionLabel::redrawParameterPopup()
+{
+    if (m_parameterPopup && m_parameterPopup->isVisible()) {
+        m_parameterPopup->close();
+        initParameterPopup();
+        m_parameterPopup->show();
+    }
+}
 
 ParameterListItemWithX::ParameterListItemWithX(const QString &text, QWidget *parent): QWidget(parent), m_text(text)
 {
@@ -167,31 +183,31 @@ ParameterListItemWithX::ParameterListItemWithX(const QString &text, QWidget *par
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(5);
 
-    connect(m_removeButton, &QPushButton::clicked, this, &ParameterListItemWithX::onRemoveButtonClicked);
+    connect(m_removeButton, &QPushButton::clicked, this, &ParameterListItemWithX::onDisconnectButtonClicked);
 }
 
-void ParameterListItemWithX::onRemoveButtonClicked()
+void ParameterListItemWithX::onDisconnectButtonClicked()
 {
-    emit removeRequested(m_text);
+    emit disconnectRequested(m_text);
 }
 
 
-QStringList putSystemParamsAtTheEnd(const QStringList &params)
+std::vector<ParameterPopup::Entry> putSystemParamsAtTheEnd(const std::vector<ParameterPopup::Entry> &params)
 {
     auto parameters = params;
-    std::sort(parameters.begin(), parameters.end(), [](const QString &a, const QString &b) {
-        if (a.startsWith('_') && !b.startsWith('_')) {
+    std::sort(parameters.begin(), parameters.end(), [](const ParameterPopup::Entry &a, const ParameterPopup::Entry &b) {
+        if (a.text.startsWith('_') && !b.text.startsWith('_')) {
             return false;
         }
-        if (!a.startsWith('_') && b.startsWith('_')) {
+        if (!a.text.startsWith('_') && b.text.startsWith('_')) {
             return true;
         }
-        return a < b;
+        return a.text < b.text;
     });
     return parameters;
 }
 
-ParameterPopup::ParameterPopup(const QStringList &parameters, QWidget *parent)
+ParameterPopup::ParameterPopup(const std::vector<Entry> &parameters, QWidget *parent)
 : QWidget(parent, Qt::Popup), m_parameters(parameters)
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
@@ -210,8 +226,18 @@ ParameterPopup::ParameterPopup(const QStringList &parameters, QWidget *parent)
     setLayout(layout);
     setMaximumHeight(300); // Set the maximum height for the popup
 
+    bool enableXBtn = false;
+    for (const auto &entry: m_parameters) {
+        if (entry.withBtn) {
+            enableXBtn = true;
+            break;
+        }
+    }
+    enableXBtn ? populateFnc = &ParameterPopup::populateListWidgetWithXBtn
+               : populateFnc = &ParameterPopup::populateListWidget;
+
     // Populate initial list widget
-    populateListWidget(m_parameters);
+    (this->*populateFnc)(m_parameters);
 }
 
 bool ParameterPopup::event(QEvent *event)
@@ -235,38 +261,21 @@ bool ParameterPopup::event(QEvent *event)
     return QWidget::event(event);
 }
 
-void ParameterPopup::setParameters(const QStringList &parameters)
+void ParameterPopup::setParameters(const std::vector<Entry> &parameters)
 {
     m_parameters = putSystemParamsAtTheEnd(parameters);
     (this->*populateFnc)(m_parameters);
 }
 
-void ParameterPopup::enableXBtn(bool enable)
-{
-    enable ? populateFnc = &ParameterPopup::populateListWidgetWithXBtn
-           : populateFnc = &ParameterPopup::populateListWidget;
-    (this->*populateFnc)(m_parameters);
-}
-
-
 void ParameterPopup::filterParameters(const QString &query)
 {
-    QStringList filteredParameters;
-    for (const QString &param: m_parameters) {
-        if (param.contains(query, Qt::CaseInsensitive)) {
-            filteredParameters << param;
+    std::vector<ParameterPopup::Entry> filteredParameters;
+    for (const auto &param: m_parameters) {
+        if (param.text.contains(query, Qt::CaseInsensitive)) {
+            filteredParameters.push_back(param);
         }
     }
     (this->*populateFnc)(filteredParameters);
-}
-
-void ParameterPopup::populateListWidget(const QStringList &parameters)
-{
-    m_listWidget->clear();
-    for (const QString &param: parameters) {
-        QListWidgetItem *item = new QListWidgetItem(displayName(param), m_listWidget);
-        m_listWidget->addItem(item);
-    }
 }
 
 QString wrapText(const QListWidget *listWidget, const QString &text)
@@ -288,34 +297,50 @@ QString wrapText(const QListWidget *listWidget, const QString &text)
     return wrappedText;
 }
 
-void ParameterPopup::populateListWidgetWithXBtn(const QStringList &parameters)
+void ParameterPopup::populateListWidget(const std::vector<Entry> &parameters)
 {
     m_listWidget->clear();
-    if (m_parameters.isEmpty()) {
-        QListWidgetItem *item = new QListWidgetItem(
+    // if a moodule had no parameters this will look ugly
+    if (m_parameters.empty()) {
+        QListWidgetItem *widgetItem = new QListWidgetItem(
             wrapText(m_listWidget, "Drag onto a module in the workflow view to connect this parameter with one of the "
                                    "module's parameters. Connected parameters share their value."),
             m_listWidget);
+        m_listWidget->addItem(widgetItem);
     }
-    for (const QString &param: parameters) {
-        QListWidgetItem *item = new QListWidgetItem(displayName(param), m_listWidget);
-        ParameterListItemWithX *widgetItem = new ParameterListItemWithX(displayName(param), m_listWidget);
-        connect(widgetItem, &ParameterListItemWithX::removeRequested, this, [this](const QString &text) {
-            // Remove the item from the list
-            for (int i = 0; i < m_listWidget->count(); ++i) {
-                QListWidgetItem *item = m_listWidget->item(i);
-                if (item->text() == text) {
-                    delete m_listWidget->takeItem(i);
-                    break;
+    for (const auto &param: parameters) {
+        QListWidgetItem *item = new QListWidgetItem(displayName(param.text), m_listWidget);
+        m_listWidget->addItem(item);
+    }
+}
+
+void ParameterPopup::populateListWidgetWithXBtn(const std::vector<Entry> &parameters)
+{
+    m_listWidget->clear();
+    for (const auto &param: parameters) {
+        QListWidgetItem *widgetItem = new QListWidgetItem(displayName(param.text), m_listWidget);
+
+        if (param.withBtn) {
+            auto item = new ParameterListItemWithX(displayName(param.text), m_listWidget);
+            connect(item, &ParameterListItemWithX::disconnectRequested, this, [this](const QString &text) {
+                // Remove the item from the list
+                for (int i = 0; i < m_listWidget->count(); ++i) {
+                    QListWidgetItem *item = m_listWidget->item(i);
+                    if (item->text() == text) {
+                        delete m_listWidget->takeItem(i);
+                        break;
+                    }
                 }
-            }
-            auto moduleId = text.split(":").first().toInt();
-            auto paramName = text.split(":").last().trimmed();
-            std::cerr << "disconnecting " << moduleId << ", " << paramName.toStdString() << std::endl;
-            emit parameterDisconnected(moduleId, parameterName(paramName));
-        });
-        item->setSizeHint(widgetItem->sizeHint());
-        m_listWidget->setItemWidget(item, widgetItem);
+                auto moduleId = text.split(":").first().toInt();
+                auto paramName = text.split(":").last().trimmed();
+                std::cerr << "disconnecting " << moduleId << ", " << paramName.toStdString() << std::endl;
+                emit parameterDisconnected(moduleId, parameterName(paramName));
+            });
+            widgetItem->setSizeHint(widgetItem->sizeHint());
+            m_listWidget->setItemWidget(widgetItem, item);
+        } else {
+            m_listWidget->addItem(widgetItem);
+        }
     }
     // Set the height of the list widget
     const int maxVisibleItems = 5;

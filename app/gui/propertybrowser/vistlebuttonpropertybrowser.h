@@ -28,10 +28,18 @@ public:
     virtual void itemRemoved(QtBrowserItem *item);
     virtual void itemChanged(QtBrowserItem *item);
     // additional nodule id of the module for which the properties are shown
-    int m_moduleId = 0;
-protected slots:
-    void parametersConnected(int fromId, QString fromName, int toId, QString toName);
+    struct Connection {
+        int fromId;
+        QString fromName;
+        int toId;
+        QString toName;
+        bool direct;
+    };
+    
+    void parametersConnected(const std::vector<Connection> &connections);
+    void parametersConnected(int fromId, QString fromName, int toId, QString toName, bool direct);
     void parametersDisconnected(int fromId, QString fromName, int toId, QString toName);
+    int m_moduleId = 0;
 private:
     VistleButtonPropertyBrowserPrivate *d_ptr;
     Q_DECLARE_PRIVATE(VistleButtonPropertyBrowser)

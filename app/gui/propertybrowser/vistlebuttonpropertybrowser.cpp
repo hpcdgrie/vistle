@@ -46,9 +46,9 @@ struct WidgetItem
     void slotEditorDestroyed();
     void slotUpdate();
     void slotToggled(bool checked);
-    void parametersConnected(int fromId, QString fromName, int toId, QString toName);
+    void parametersConnected(int fromId, QString fromName, int toId, QString toName, bool direct);
     void parametersDisconnected(int fromId, QString fromName, int toId, QString toName);
-
+    void clearConnections();
 private:
     void updateLater();
     //this is the changed function to enable parameter connections via the WidgetItem::label
@@ -207,12 +207,12 @@ void VistleButtonPropertyBrowserPrivate::slotToggled(bool checked)
         emit q_ptr->collapsed(m_itemToIndex.value(item));
 }
 
-void VistleButtonPropertyBrowserPrivate::parametersConnected(int fromId, QString fromName, int toId, QString toName)
+void VistleButtonPropertyBrowserPrivate::parametersConnected(int fromId, QString fromName, int toId, QString toName, bool direct)
 {
     for(auto item : m_indexToItem) {
         if(item->label && item->label->text().endsWith(fromName)) {
             if(auto paramLabel = dynamic_cast<gui::ParameterConnectionLabel*>(item->label))
-                paramLabel->connectParam(toId, toName);
+                paramLabel->connectParam(toId, toName, direct);
         }
     }
 }
@@ -223,6 +223,16 @@ void VistleButtonPropertyBrowserPrivate::parametersDisconnected(int fromId, QStr
         if(item->label && item->label->text().endsWith(fromName)) {
             if(auto paramLabel = dynamic_cast<gui::ParameterConnectionLabel*>(item->label))
                 paramLabel->disconnectParam(toId, toName);
+        }
+    }
+}
+
+void VistleButtonPropertyBrowserPrivate::clearConnections()
+{
+    for(auto item : m_indexToItem) {
+        if(item->label) {
+            if(auto paramLabel = dynamic_cast<gui::ParameterConnectionLabel*>(item->label))
+                paramLabel->clearConnections();
         }
     }
 }
@@ -616,14 +626,27 @@ bool VistleButtonPropertyBrowser::isExpanded(QtBrowserItem *item) const
     return false;
 }
 
-void VistleButtonPropertyBrowser::parametersConnected(int fromId, QString fromName, int toId, QString toName)
+void VistleButtonPropertyBrowser::parametersConnected(const std::vector<Connection> &connections)
+{
+    d_ptr->clearConnections();
+    for(auto &c : connections)
+    {
+        if(m_moduleId == c.toId)
+            d_ptr->parametersConnected(c.toId, c.toName, c.fromId, c.fromName, c.direct);
+        else
+            d_ptr->parametersConnected(c.fromId, c.fromName, c.toId, c.toName, c.direct);
+    }
+}
+
+
+void VistleButtonPropertyBrowser::parametersConnected(int fromId, QString fromName, int toId, QString toName, bool direct)
 {
     if(m_moduleId != fromId && m_moduleId != toId)
         return;
     if(m_moduleId == fromId)
-        d_ptr->parametersConnected(fromId, fromName, toId, toName);
+        d_ptr->parametersConnected(fromId, fromName, toId, toName, direct);
     else
-        d_ptr->parametersConnected(toId, toName, fromId, fromName);
+        d_ptr->parametersConnected(toId, toName, fromId, fromName, direct);
 }
 
 void VistleButtonPropertyBrowser::parametersDisconnected(int fromId, QString fromName, int toId, QString toName)

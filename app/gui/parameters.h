@@ -37,12 +37,11 @@ public:
     void setVistleObserver(VistleObserver *observer);
     void setVistleConnection(vistle::VistleConnection *conn);
     void setModule(int id);
+    void setConnectedParameters();
     static const char *mimeFormat();
 
 private slots:
     void newParameter(int moduleId, QString parameterName);
-    void newConnection(int fromId, QString fromName, int toId, QString toName);
-    void deleteConnection(int fromId, QString fromName, int toId, QString toName);
     void deleteParameter(int moduleId, QString parameterName);
     void parameterValueChanged(int moduleId, QString parameterName);
     void parameterChoicesChanged(int moduleId, QString parameterName);
@@ -53,12 +52,7 @@ private:
     void setParameterEnabled(QtProperty *prop, bool state);
     bool getExpandedState(QString name, bool &state);
     void addItemWithProperty(QtBrowserItem *item, QtProperty *prop);
-    // QWidget *createEditor(QtProperty *property, QWidget *parent) override;
 
-    // void itemChanged(QtBrowserItem *item) override;
-    // void itemInserted(QtBrowserItem *item, QtBrowserItem *afterItem) override;
-    // void itemRemoved(QtBrowserItem *item) override;
-    // void updateItem(QtBrowserItem *item);
     vistle::VistleConnection *m_vistle;
 
     std::map<QString, QtProperty *> m_groups;
