@@ -151,18 +151,24 @@ void ParameterConnectionLabel::initParameterPopup()
         parameters.push_back(QString("%1: %2").arg(c.moduleId).arg(c.paramName));
         withBtn.push_back(c.direct);
     }
-    m_parameterPopup = std::make_unique<ParameterPopupWithBtn>(parameters, withBtn);
-    connect(m_parameterPopup.get(), &ParameterPopupWithBtn::parameterSelected, this,
-            [this](const QString &param) { m_parameterPopup->close(); });
-    connect(m_parameterPopup.get(), &ParameterPopupWithBtn::parameterHovered, this,
-            [this](int moduleId, const QString &param) { emit highlightModule(moduleId); });
-    connect(m_parameterPopup.get(), &ParameterPopupWithBtn::parameterDisconnected, this,
-            [this](int moduleId, const QString &param) {
-                emit disconnectParameters(m_moduleId, parameterName(m_paramName), moduleId, param);
-            });
-    m_parameterPopup->setAttribute(Qt::WA_Hover);
-    QPoint globalPos = mapToGlobal(QPoint(0, height()));
-    m_parameterPopup->move(globalPos);
+    if (!m_parameterPopup) {
+        m_parameterPopup = std::make_unique<ParameterPopupWithBtn>(parameters, withBtn);
+        connect(m_parameterPopup.get(), &ParameterPopupWithBtn::parameterSelected, this,
+                [this](const QString &param) { m_parameterPopup->close(); });
+        connect(m_parameterPopup.get(), &ParameterPopupWithBtn::parameterHovered, this,
+                [this](int moduleId, const QString &param) { emit highlightModule(moduleId); });
+        connect(m_parameterPopup.get(), &ParameterPopupWithBtn::parameterDisconnected, this,
+                [this](int moduleId, const QString &param) {
+                    emit disconnectParameters(m_moduleId, parameterName(m_paramName), moduleId, param);
+                });
+        m_parameterPopup->setAttribute(Qt::WA_Hover);
+        QPoint globalPos = mapToGlobal(QPoint(0, height()));
+        m_parameterPopup->move(globalPos);
+
+    } else {
+        m_parameterPopup->setButtons(withBtn);
+        m_parameterPopup->setParameters(parameters);
+    }
 }
 
 void ParameterConnectionLabel::redrawParameterPopup()
@@ -193,21 +199,6 @@ void ParameterListItemWithX::onDisconnectButtonClicked()
     emit disconnectRequested(m_text);
 }
 
-
-// std::vector<ParameterPopup::Entry> putSystemParamsAtTheEnd(const std::vector<ParameterPopup::Entry> &params)
-// {
-//     auto parameters = params;
-//     std::sort(parameters.begin(), parameters.end(), [](const ParameterPopup::Entry &a, const ParameterPopup::Entry &b) {
-//         if (a.text.startsWith('_') && !b.text.startsWith('_')) {
-//             return false;
-//         }
-//         if (!a.text.startsWith('_') && b.text.startsWith('_')) {
-//             return true;
-//         }
-//         return a.text < b.text;
-//     });
-//     return parameters;
-// }
 
 QStringList filterParameters(const QStringList &parameters, const QString &query)
 {
@@ -320,34 +311,26 @@ QString wrapText(const QListWidget *listWidget, const QString &text)
 
 void ParameterPopupWithBtn::populateListWidget(const QStringList &parameters)
 {
+    if (m_parameters.size() != m_withBtn.size())
+        return;
+    m_listWidget->clear();
     if (parameters.empty()) {
         QListWidgetItem *widgetItem = new QListWidgetItem(
             wrapText(m_listWidget, "Drag onto a module in the workflow view to connect this parameter with one of the "
                                    "module's parameters. Connected parameters share their value."),
             m_listWidget);
         m_listWidget->addItem(widgetItem);
-        return;
     }
 
     auto withBtn = sortLike(parameters, m_parameters, m_withBtn);
-    m_listWidget->clear();
     for (const auto &param: parameters) {
         QListWidgetItem *widgetItem = new QListWidgetItem(displayName(param), m_listWidget);
 
         if (withBtn[&param - &parameters[0]]) {
             auto item = new ParameterListItemWithX(displayName(param), m_listWidget);
             connect(item, &ParameterListItemWithX::disconnectRequested, this, [this](const QString &text) {
-                // Remove the item from the list
-                for (int i = 0; i < m_listWidget->count(); ++i) {
-                    QListWidgetItem *item = m_listWidget->item(i);
-                    if (item->text() == text) {
-                        delete m_listWidget->takeItem(i);
-                        break;
-                    }
-                }
                 auto moduleId = text.split(":").first().toInt();
                 auto paramName = text.split(":").last().trimmed();
-                std::cerr << "disconnecting " << moduleId << ", " << paramName.toStdString() << std::endl;
                 emit parameterDisconnected(moduleId, parameterName(paramName));
             });
             widgetItem->setSizeHint(widgetItem->sizeHint());
@@ -365,135 +348,23 @@ void ParameterPopupWithBtn::populateListWidget(const QStringList &parameters)
     m_listWidget->setFixedHeight(totalHeight);
 }
 
-
-// ParameterPopup::ParameterPopup(const std::vector<Entry> &parameters, QWidget *parent)
-// : QWidget(parent, Qt::Popup), m_parameters(parameters)
-// {
-//     QVBoxLayout *layout = new QVBoxLayout(this);
-
-//     // Add search field
-//     m_searchField = new QLineEdit(this);
-//     m_searchField->setPlaceholderText("Search...");
-//     layout->addWidget(m_searchField);
-//     connect(m_searchField, &QLineEdit::textChanged, this, &ParameterPopup::filterParameters);
-
-//     // Add list widget
-//     m_listWidget = new QListWidget(this);
-//     layout->addWidget(m_listWidget);
-//     connect(m_listWidget, &QListWidget::itemClicked, this,
-//             [this](QListWidgetItem *item) { emit parameterSelected(parameterName(item->text())); });
-
-//     setLayout(layout);
-//     setMaximumHeight(300); // Set the maximum height for the popup
-
-//     bool enableXBtn = false;
-//     for (const auto &entry: m_parameters) {
-//         if (entry.withBtn) {
-//             enableXBtn = true;
-//             break;
-//         }
-//     }
-//     enableXBtn ? populateFnc = &ParameterPopup::populateListWidgetWithXBtn
-//                : populateFnc = &ParameterPopup::populateListWidget;
-
-//     // Populate initial list widget
-//     (this->*populateFnc)(m_parameters);
-// }
-
-// bool ParameterPopup::event(QEvent *event)
-// {
-//     static QListWidgetItem *lastHoveredItem = nullptr;
-//     if (event->type() == QEvent::HoverMove) {
-//         QHoverEvent *hoverEvent = static_cast<QHoverEvent *>(event);
-//         QPoint listWidgetPos = m_listWidget->mapFrom(this, hoverEvent->pos());
-//         QListWidgetItem *item = m_listWidget->itemAt(listWidgetPos);
-//         if (item && item != lastHoveredItem) {
-//             lastHoveredItem = item;
-//             auto moduleId = item->text().split(":").first().toInt();
-//             auto paramName = item->text().split(":").last().trimmed();
-//             emit parameterHovered(-1, "");
-//             emit parameterHovered(moduleId, paramName);
-//         } else if (!item) {
-//             lastHoveredItem = nullptr;
-//             emit parameterHovered(-1, "");
-//         }
-//     }
-//     return QWidget::event(event);
-// }
-
-// void ParameterPopup::setParameters(const std::vector<Entry> &parameters)
-// {
-//     m_parameters = putSystemParamsAtTheEnd(parameters);
-//     (this->*populateFnc)(m_parameters);
-// }
-
-// void ParameterPopup::filterParameters(const QString &query)
-// {
-//     std::vector<ParameterPopup::Entry> filteredParameters;
-//     for (const auto &param: m_parameters) {
-//         if (param.text.contains(query, Qt::CaseInsensitive)) {
-//             filteredParameters.push_back(param);
-//         }
-//     }
-//     (this->*populateFnc)(filteredParameters);
-// }
-
-
-// void ParameterPopup::populateListWidget(const std::vector<Entry> &parameters)
-// {
-//     m_listWidget->clear();
-//     // if a moodule had no parameters this will look ugly
-//     if (m_parameters.empty()) {
-//         QListWidgetItem *widgetItem = new QListWidgetItem(
-//             wrapText(m_listWidget, "Drag onto a module in the workflow view to connect this parameter with one of the "
-//                                    "module's parameters. Connected parameters share their value."),
-//             m_listWidget);
-//         m_listWidget->addItem(widgetItem);
-//     }
-//     for (const auto &param: parameters) {
-//         QListWidgetItem *item = new QListWidgetItem(displayName(param.text), m_listWidget);
-//         m_listWidget->addItem(item);
-//     }
-// }
-
-// void ParameterPopup::populateListWidgetWithXBtn(const std::vector<Entry> &parameters)
-// {
-//     m_listWidget->clear();
-//     for (const auto &param: parameters) {
-//         QListWidgetItem *widgetItem = new QListWidgetItem(displayName(param.text), m_listWidget);
-
-//         if (param.withBtn) {
-//             auto item = new ParameterListItemWithX(displayName(param.text), m_listWidget);
-//             connect(item, &ParameterListItemWithX::disconnectRequested, this, [this](const QString &text) {
-//                 // Remove the item from the list
-//                 for (int i = 0; i < m_listWidget->count(); ++i) {
-//                     QListWidgetItem *item = m_listWidget->item(i);
-//                     if (item->text() == text) {
-//                         delete m_listWidget->takeItem(i);
-//                         break;
-//                     }
-//                 }
-//                 auto moduleId = text.split(":").first().toInt();
-//                 auto paramName = text.split(":").last().trimmed();
-//                 std::cerr << "disconnecting " << moduleId << ", " << paramName.toStdString() << std::endl;
-//                 emit parameterDisconnected(moduleId, parameterName(paramName));
-//             });
-//             widgetItem->setSizeHint(widgetItem->sizeHint());
-//             m_listWidget->setItemWidget(widgetItem, item);
-//         } else {
-//             m_listWidget->addItem(widgetItem);
-//         }
-//     }
-//     // Set the height of the list widget
-//     const int maxVisibleItems = 5;
-//     const int itemHeight = m_listWidget->sizeHintForRow(0);
-//     const int itemCount = m_listWidget->count();
-//     const int visibleItemCount = qMin(itemCount, maxVisibleItems);
-//     const int totalHeight = visibleItemCount * itemHeight + 2 * m_listWidget->frameWidth();
-//     m_listWidget->setFixedHeight(totalHeight);
-// }
-
-// void ParameterPopup::onParameterSelected(QListWidgetItem *item)
-// {
-//     emit parameterSelected(parameterName(item->text()));
-// }
+bool ParameterPopupWithBtn::event(QEvent *event)
+{
+    static QListWidgetItem *lastHoveredItem = nullptr;
+    if (event->type() == QEvent::HoverMove) {
+        QHoverEvent *hoverEvent = static_cast<QHoverEvent *>(event);
+        QPoint listWidgetPos = m_listWidget->mapFrom(this, hoverEvent->pos());
+        QListWidgetItem *item = m_listWidget->itemAt(listWidgetPos);
+        if (item && item != lastHoveredItem) {
+            lastHoveredItem = item;
+            auto moduleId = item->text().split(":").first().toInt();
+            auto paramName = item->text().split(":").last().trimmed();
+            emit parameterHovered(-1, "");
+            emit parameterHovered(moduleId, paramName);
+        } else if (!item) {
+            lastHoveredItem = nullptr;
+            emit parameterHovered(-1, "");
+        }
+    }
+    return QWidget::event(event);
+}

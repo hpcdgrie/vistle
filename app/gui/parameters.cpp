@@ -163,21 +163,22 @@ void Parameters::setModule(int id)
 void Parameters::setConnectedParameters()
 {
     //std::cerr << "Parameters: showing for " << id << std::endl;
-    if (!m_vistle)
+    if (!m_vistle || m_moduleId == -1)
         return;
     auto params = m_vistle->getParameters(m_moduleId);
     std::vector<Connection> connections;
     for (auto &p: params) {
         auto vistleParam = m_vistle->getParameter(m_moduleId, p);
         auto connectedParams = m_vistle->ui().state().getConnectedParameters(*vistleParam);
-        const auto &portTracker = m_vistle->ui().state().portTracker();
-        const auto port = portTracker->findPort(vistleParam->module(), vistleParam->getName());
-        auto directlyConnectedParams = portTracker->getConnectionList(port);
-        for (const auto &c: connectedParams) {
-            auto direct = directlyConnectedParams->find(portTracker->getPort(c->module(), c->getName())) !=
-                          directlyConnectedParams->end();
+        auto directlyConnectedParams = m_vistle->ui().state().getDirectlyConnectedParameters(*vistleParam);
+        for (const auto &c: directlyConnectedParams) {
+            connectedParams.erase(c);
             connections.push_back({m_moduleId, displayName(QString::fromStdString(p)), c->module(),
-                                   displayName(QString::fromStdString(c->getName())), direct});
+                                   displayName(QString::fromStdString(c->getName())), true});
+        }
+        for (const auto &c: connectedParams) {
+            connections.push_back({m_moduleId, displayName(QString::fromStdString(p)), c->module(),
+                                   displayName(QString::fromStdString(c->getName())), false});
         }
     }
     parametersConnected(connections);

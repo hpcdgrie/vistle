@@ -48,7 +48,7 @@ signals:
 
 private:
     void populateListWidget(const QStringList &parameters) override;
-
+    bool event(QEvent *event) override;
     std::vector<bool> m_withBtn;
 };
 
