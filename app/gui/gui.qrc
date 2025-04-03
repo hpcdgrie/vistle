@@ -21,5 +21,6 @@
         <file alias="display.svg">icons/display.svg</file>
         <file alias="proxy.svg">icons/link.svg</file>
         <file alias="parameterconnected.svg">icons/link.svg</file>
+        <file alias="search.svg">icons/search-solid.svg</file>
     </qresource>
 </RCC>

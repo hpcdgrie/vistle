@@ -24,6 +24,7 @@ class ParameterPopup: public QWidget {
 public:
     ParameterPopup(const QStringList &parameters);
     void setParameters(const QStringList &parameters);
+    void setSearchText(const QString &text);
 signals:
     void parameterSelected(const QString &param);
 
@@ -31,8 +32,6 @@ protected:
     virtual void populateListWidget(const QStringList &parameters);
     QStringList m_parameters;
     QListWidget *m_listWidget;
-
-private:
     QLineEdit *m_searchField;
 };
 

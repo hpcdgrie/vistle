@@ -961,6 +961,7 @@ void Module::showParameters(const ParameterConnectionRequest &request)
 {
     auto params = scene()->getModuleParameters(m_id);
     m_parameterPopup->setParameters(params);
+    m_parameterPopup->setSearchText(request.paramName);
     m_parameterConnectionRequest = request;
     m_parameterPopup->move(request.pos);
     m_parameterPopup->show();

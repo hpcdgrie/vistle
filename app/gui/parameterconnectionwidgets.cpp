@@ -118,6 +118,7 @@ void ParameterConnectionLabel::mouseReleaseEvent(QMouseEvent *event)
         return;
     }
     m_parameterPopup->show();
+    m_parameterPopup->setSearchText(m_paramName);
 }
 
 bool ParameterConnectionLabel::event(QEvent *event)
@@ -203,15 +204,63 @@ void ParameterListItemWithX::onDisconnectButtonClicked()
     emit disconnectRequested(m_text);
 }
 
+size_t computeLevensteinDistance(const QString &s1, const QString &s2)
+{
+    const int len1 = s1.size();
+    const int len2 = s2.size();
+
+    if (len1 == 0)
+        return len2;
+    if (len2 == 0)
+        return len1;
+
+    std::vector<size_t> prev_row(len2 + 1);
+    std::vector<size_t> cur_row(len2 + 1);
+
+    for (int j = 0; j <= len2; ++j) {
+        prev_row[j] = j;
+    }
+
+    for (int i = 1; i <= len1; ++i) {
+        cur_row[0] = i; 
+
+        for (int j = 1; j <= len2; ++j) {
+            size_t cost = (s1[i - 1].toLower() == s2[j - 1].toLower()) ? 0 : 1;
+
+            cur_row[j] = std::min({
+                prev_row[j] + 1,
+                cur_row[j - 1] + 1, 
+                prev_row[j - 1] + cost
+            });
+        }
+        std::swap(prev_row, cur_row);
+    }
+    return prev_row[len2];
+}
 
 QStringList filterParameters(const QStringList &parameters, const QString &query)
 {
-    QStringList filteredParameters;
+    std::vector<std::pair<int, QString>> scores;
     for (const auto &param: parameters) {
-        if (param.contains(query, Qt::CaseInsensitive)) {
-            filteredParameters.push_back(param);
+        if (param.startsWith(query, Qt::CaseInsensitive)) {
+            scores.push_back({100, param});
+        } else if (param.contains(query, Qt::CaseInsensitive)) {
+            scores.push_back({50, param});
+        } else {
+            scores.push_back({49 - computeLevensteinDistance(param, query), param});
         }
     }
+    std::sort(scores.begin(), scores.end(), [](const auto &a, const auto &b) {
+        if (a.first == b.first) {
+            return a.second < b.second;
+        }
+        return a.first > b.first;
+    });
+    QStringList filteredParameters;
+    for (const auto &score: scores) {
+        filteredParameters.push_back(score.second);
+    }
+
     return filteredParameters;
 }
 
@@ -222,6 +271,12 @@ ParameterPopup::ParameterPopup(const QStringList &parameters): QWidget(nullptr, 
     // Add search field
     m_searchField = new QLineEdit(this);
     m_searchField->setPlaceholderText("Search...");
+
+    // Add a search icon using QLineEdit::addAction
+    QIcon searchIcon(":/icons/search.svg");
+    QAction *searchAction = m_searchField->addAction(searchIcon, QLineEdit::LeadingPosition);
+
+
     layout->addWidget(m_searchField);
     connect(m_searchField, &QLineEdit::textChanged, this,
             [this](const QString &query) { populateListWidget(filterParameters(m_parameters, query)); });
@@ -259,6 +314,25 @@ void ParameterPopup::setParameters(const QStringList &parameters)
     populateListWidget(m_parameters);
 }
 
+void ParameterPopup::setSearchText(const QString &text)
+{
+    m_searchField->setText(text);
+    m_searchField->textChanged(text);
+    m_searchField->setCursorPosition(0);
+    m_searchField->selectAll();
+    m_searchField->setFocus();
+}
+
+void setListWidgetHeigt(QListWidget *listWidget)
+{
+    const int maxVisibleItems = 5;
+    const int itemHeight = listWidget->sizeHintForRow(0);
+    const int itemCount = listWidget->count();
+    const int visibleItemCount = qMin(itemCount, maxVisibleItems);
+    const int totalHeight = visibleItemCount * itemHeight + 2 * listWidget->frameWidth();
+    listWidget->setFixedHeight(totalHeight);
+}
+
 void ParameterPopup::populateListWidget(const QStringList &parameters)
 {
     m_listWidget->clear();
@@ -267,6 +341,7 @@ void ParameterPopup::populateListWidget(const QStringList &parameters)
         QListWidgetItem *item = new QListWidgetItem(displayName(param), m_listWidget);
         m_listWidget->addItem(item);
     }
+    setListWidgetHeigt(m_listWidget);
 }
 
 ParameterPopupWithBtn::ParameterPopupWithBtn(const QStringList &parameters, std::vector<bool> withBtn)
@@ -320,13 +395,19 @@ void ParameterPopupWithBtn::populateListWidget(const QStringList &parameters)
         return;
     m_listWidget->clear();
     if (parameters.empty()) {
+        m_searchField->hide();
+        auto headline = new QListWidgetItem(m_listWidget);
+        QLabel *label = new QLabel(m_listWidget);
+        label->setText("<b>Drag onto a module</b>");
+        m_listWidget->setItemWidget(headline, label);
         QListWidgetItem *widgetItem = new QListWidgetItem(
-            wrapText(m_listWidget, "Drag onto a module in the workflow view to connect this parameter with one of the "
+            wrapText(m_listWidget, " in the workflow view to connect this parameter with one of the "
                                    "module's parameters. Connected parameters share their value."),
             m_listWidget);
         m_listWidget->addItem(widgetItem);
+    } else {
+        m_searchField->show();
     }
-
     auto withBtn = sortLike(parameters, m_parameters, m_withBtn);
     for (const auto &param: parameters) {
         QListWidgetItem *widgetItem = new QListWidgetItem(displayName(param), m_listWidget);
@@ -344,13 +425,7 @@ void ParameterPopupWithBtn::populateListWidget(const QStringList &parameters)
             m_listWidget->addItem(widgetItem);
         }
     }
-    // Set the height of the list widget
-    const int maxVisibleItems = 5;
-    const int itemHeight = m_listWidget->sizeHintForRow(0);
-    const int itemCount = m_listWidget->count();
-    const int visibleItemCount = qMin(itemCount, maxVisibleItems);
-    const int totalHeight = visibleItemCount * itemHeight + 2 * m_listWidget->frameWidth();
-    m_listWidget->setFixedHeight(totalHeight);
+    setListWidgetHeigt(m_listWidget);
 }
 
 bool ParameterPopupWithBtn::event(QEvent *event)
