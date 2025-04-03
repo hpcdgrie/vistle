@@ -40,7 +40,7 @@ class ParameterPopupWithBtn: public ParameterPopup {
     Q_OBJECT
 public:
     ParameterPopupWithBtn(const QStringList &parameters, std::vector<bool> withBtn);
-    void setButtons(const std::vector<bool> &withBtn);
+    void setParameters(const QStringList &parameters, const std::vector<bool> &withBtn);
 signals:
     void parameterSelected(const QString &param);
     void parameterHovered(int moduleId, const QString &param);
@@ -78,6 +78,7 @@ public:
     void connectParam(int moduleId, const QString &paramName, bool direct);
     void disconnectParam(int moduleId, const QString &paramName);
     void clearConnections();
+    void hideText();
 signals:
     void highlightModule(int moduleId); //sends -1 if no module is to be highlighted
     void disconnectParameters(int fromId, const QString &fromName, int toId, const QString &toName);
@@ -89,7 +90,7 @@ protected:
 
 private:
     int m_moduleId;
-    QString m_paramName;
+    QString m_paramName, m_showName;
     struct Connection {
         int moduleId;
         QString paramName;

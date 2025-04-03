@@ -26,6 +26,7 @@ struct WidgetItem
             button(0), container(0), layout(0), /*line(0), */parent(0), expanded(false) { }
     QWidget *widget; // can be null
     QLabel *label; // main label with property name
+    QString paramName;
     QLabel *widgetLabel; // label substitute showing the current value if there is no widget
     QToolButton *button; // expandable button for items with children
     QWidget *container; // container which is expanded when the button is clicked
@@ -37,7 +38,7 @@ struct WidgetItem
 
     void init(QWidget *parent);
 
-    WidgetItem *propertyInserted(int moduleId, QtBrowserItem *index, QtBrowserItem *afterIndex);
+    gui::ParameterConnectionLabel *propertyInserted(int moduleId, QtBrowserItem *index, QtBrowserItem *afterIndex);
     void propertyRemoved(QtBrowserItem *index);
     void propertyChanged(QtBrowserItem *index);
     QWidget *createEditor(QtProperty *property, QWidget *parent) const
@@ -210,7 +211,7 @@ void VistleButtonPropertyBrowserPrivate::slotToggled(bool checked)
 void VistleButtonPropertyBrowserPrivate::parametersConnected(int fromId, QString fromName, int toId, QString toName, bool direct)
 {
     for(auto item : m_indexToItem) {
-        if(item->label && item->label->text().endsWith(fromName)) {
+        if(item->paramName == fromName) {
             if(auto paramLabel = dynamic_cast<gui::ParameterConnectionLabel*>(item->label))
                 paramLabel->connectParam(toId, toName, direct);
         }
@@ -220,7 +221,7 @@ void VistleButtonPropertyBrowserPrivate::parametersConnected(int fromId, QString
 void VistleButtonPropertyBrowserPrivate::parametersDisconnected(int fromId, QString fromName, int toId, QString toName)
 {
     for(auto item : m_indexToItem) {
-        if(item->label && item->label->text().endsWith(fromName)) {
+        if(item->paramName == fromName) {
             if(auto paramLabel = dynamic_cast<gui::ParameterConnectionLabel*>(item->label))
                 paramLabel->disconnectParam(toId, toName);
         }
@@ -242,13 +243,30 @@ void VistleButtonPropertyBrowserPrivate::updateLater()
     QTimer::singleShot(0, q_ptr, SLOT(slotUpdate()));
 }
 
-VistleButtonPropertyBrowserPrivate::WidgetItem *VistleButtonPropertyBrowserPrivate::propertyInserted(int moduleId, QtBrowserItem *index, QtBrowserItem *afterIndex)
+bool isVector(QtProperty *property)
+{
+    if (property->subProperties().size() == 0)
+        return false;
+    constexpr std::array<const char*, 4> names = {"x", "y", "z", "w"};
+    int index = 0;
+    for(const auto &sub : property->subProperties()) {
+        if (sub->propertyName() != names[index])
+            return false;
+        ++index;
+        if (index >= names.size())
+            break;
+    }
+    return true;
+}
+
+gui::ParameterConnectionLabel *VistleButtonPropertyBrowserPrivate::propertyInserted(int moduleId, QtBrowserItem *index, QtBrowserItem *afterIndex)
 {
     WidgetItem *afterItem = m_indexToItem.value(afterIndex);
     WidgetItem *parentItem = m_indexToItem.value(index->parent());
-
+    gui::ParameterConnectionLabel * retval = nullptr;
     WidgetItem *newItem = new WidgetItem();
     newItem->parent = parentItem;
+    newItem->paramName = index->property()->propertyName();
 
     QGridLayout *layout = 0;
     QWidget *parentWidget = 0;
@@ -266,7 +284,6 @@ VistleButtonPropertyBrowserPrivate::WidgetItem *VistleButtonPropertyBrowserPriva
         else
             m_children.insert(m_children.indexOf(afterItem) + 1, newItem);
     }
-
     if (!parentItem) {
         layout = m_mainLayout;
         parentWidget = q_ptr;
@@ -295,17 +312,40 @@ VistleButtonPropertyBrowserPrivate::WidgetItem *VistleButtonPropertyBrowserPriva
                 delete parentItem->label;
                 parentItem->label = 0;
             }
-            int span = 1;
+            int span = 1; 
             if (!parentItem->widget && !parentItem->widgetLabel)
                 span = 2;
-            l->addWidget(parentItem->button, oldRow, 0, 1, span);
+            auto column = 0;
+            if(isVector(m_itemToIndex[parentItem]->property())) {
+                QWidget *container = new QWidget(parentWidget);
+                auto hLayout = new QHBoxLayout(container);
+                hLayout->setContentsMargins(0, 0, 0, 0);
+                auto label = new gui::ParameterConnectionLabel(moduleId, m_itemToIndex[parentItem]->property()->propertyName(), container);
+                label->setSizePolicy(QSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed));
+                label->hideText();
+                parentItem->label = label;
+                retval = label;
+                hLayout->addWidget(label);
+                hLayout->addWidget(parentItem->button);
+                l->addWidget(container, oldRow, column, 1, span);
+            } else
+                l->addWidget(parentItem->button, oldRow, column, 1, span);
             updateItem(parentItem);
         }
         layout = parentItem->layout;
         parentWidget = parentItem->container;
     }
 
-    newItem->label = new gui::ParameterConnectionLabel(moduleId, index->property()->propertyName(), parentWidget);
+    if(!parentItem || !isVector(m_itemToIndex[parentItem]->property()))
+    {        
+        retval = new gui::ParameterConnectionLabel(moduleId, index->property()->propertyName(), parentWidget);
+        newItem->label = retval;
+    }
+    else
+    {
+        newItem->label = new QLabel(parentWidget);
+        newItem->label->setText(index->property()->propertyName());
+    }
     newItem->label->setSizePolicy(QSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed));
     newItem->widget = createEditor(index->property(), parentWidget);
     if (newItem->widget) {
@@ -330,7 +370,7 @@ VistleButtonPropertyBrowserPrivate::WidgetItem *VistleButtonPropertyBrowserPriva
     m_indexToItem[index] = newItem;
 
     updateItem(newItem);
-    return newItem;
+    return retval;
 }
 
 void VistleButtonPropertyBrowserPrivate::propertyRemoved(QtBrowserItem *index)
@@ -571,15 +611,13 @@ VistleButtonPropertyBrowser::~VistleButtonPropertyBrowser()
 */
 void VistleButtonPropertyBrowser::itemInserted(QtBrowserItem *item, QtBrowserItem *afterItem)
 {
-    auto newItem = d_ptr->propertyInserted(m_moduleId, item, afterItem);
-    auto label = dynamic_cast<gui::ParameterConnectionLabel*>(newItem->label);
+    auto label = d_ptr->propertyInserted(m_moduleId, item, afterItem);
     if(label)
     {
         connect(label, &gui::ParameterConnectionLabel::highlightModule, this, &VistleButtonPropertyBrowser::highlightModule);
         connect(label, &gui::ParameterConnectionLabel::disconnectParameters, this, [this](int fromId, const QString &fromName, int toId, const QString &toName) {
             emit disconnectParameters(fromId, fromName, toId, toName);
         });
-
     }
 }
 
@@ -636,27 +674,6 @@ void VistleButtonPropertyBrowser::parametersConnected(const std::vector<Connecti
         else
             d_ptr->parametersConnected(c.fromId, c.fromName, c.toId, c.toName, c.direct);
     }
-}
-
-
-void VistleButtonPropertyBrowser::parametersConnected(int fromId, QString fromName, int toId, QString toName, bool direct)
-{
-    if(m_moduleId != fromId && m_moduleId != toId)
-        return;
-    if(m_moduleId == fromId)
-        d_ptr->parametersConnected(fromId, fromName, toId, toName, direct);
-    else
-        d_ptr->parametersConnected(toId, toName, fromId, fromName, direct);
-}
-
-void VistleButtonPropertyBrowser::parametersDisconnected(int fromId, QString fromName, int toId, QString toName)
-{
-    if(m_moduleId != fromId && m_moduleId != toId)
-        return;
-    if(m_moduleId == fromId)
-        d_ptr->parametersDisconnected(fromId, fromName, toId, toName);
-    else
-        d_ptr->parametersDisconnected(toId, toName, fromId, fromName);
 }
 
 

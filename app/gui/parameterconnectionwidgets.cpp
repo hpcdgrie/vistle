@@ -58,9 +58,9 @@ void setParamText(QLabel *label, const QString &paramName, bool connected)
 }
 
 ParameterConnectionLabel::ParameterConnectionLabel(int moduleId, const QString &paramName, QWidget *parent)
-: QLabel(parent), m_moduleId(moduleId), m_paramName(paramName)
+: QLabel(parent), m_moduleId(moduleId), m_paramName(paramName), m_showName(paramName)
 {
-    setParamText(this, displayName(paramName), false);
+    setParamText(this, displayName(m_showName), false);
 }
 
 void ParameterConnectionLabel::connectParam(int moduleId, const QString &paramName, bool direct)
@@ -69,7 +69,7 @@ void ParameterConnectionLabel::connectParam(int moduleId, const QString &paramNa
         return;
     m_connectedParameters.push_back({moduleId, paramName, direct});
     // setStyleSheet("color: blue; border: 1px solid black; padding: 2px;");
-    setParamText(this, displayName(m_paramName), true);
+    setParamText(this, displayName(m_showName), true);
     redrawParameterPopup();
 }
 
@@ -81,15 +81,22 @@ void ParameterConnectionLabel::disconnectParam(int moduleId, const QString &para
     if (it != m_connectedParameters.end())
         m_connectedParameters.erase(it);
     if (m_connectedParameters.empty())
-        setParamText(this, displayName(m_paramName), false);
+        setParamText(this, displayName(m_showName), false);
 }
 
 void ParameterConnectionLabel::clearConnections()
 {
     m_connectedParameters.clear();
-    setParamText(this, displayName(m_paramName), false);
+    setParamText(this, displayName(m_showName), false);
     redrawParameterPopup();
 }
+
+void ParameterConnectionLabel::hideText()
+{
+    m_showName = "";
+    setParamText(this, displayName(m_showName), false);
+}
+
 
 void ParameterConnectionLabel::mousePressEvent(QMouseEvent *event)
 {
@@ -162,21 +169,18 @@ void ParameterConnectionLabel::initParameterPopup()
                     emit disconnectParameters(m_moduleId, parameterName(m_paramName), moduleId, param);
                 });
         m_parameterPopup->setAttribute(Qt::WA_Hover);
-        QPoint globalPos = mapToGlobal(QPoint(0, height()));
-        m_parameterPopup->move(globalPos);
 
     } else {
-        m_parameterPopup->setButtons(withBtn);
-        m_parameterPopup->setParameters(parameters);
+        m_parameterPopup->setParameters(parameters, withBtn);
     }
+    QPoint globalPos = mapToGlobal(QPoint(0, height()));
+    m_parameterPopup->move(globalPos);
 }
 
 void ParameterConnectionLabel::redrawParameterPopup()
 {
     if (m_parameterPopup && m_parameterPopup->isVisible()) {
-        m_parameterPopup->close();
         initParameterPopup();
-        m_parameterPopup->show();
     }
 }
 
@@ -271,9 +275,10 @@ ParameterPopupWithBtn::ParameterPopupWithBtn(const QStringList &parameters, std:
     populateListWidget(m_parameters);
 }
 
-void ParameterPopupWithBtn::setButtons(const std::vector<bool> &withBtn)
+void ParameterPopupWithBtn::setParameters(const QStringList &parameters, const std::vector<bool> &withBtn)
 {
     m_withBtn = withBtn;
+    m_parameters = parameters;
     populateListWidget(m_parameters);
 }
 
