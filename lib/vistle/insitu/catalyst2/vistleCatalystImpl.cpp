@@ -34,6 +34,30 @@ struct ConnectionParams {
     int64_t fortranComm = 0;
 };
 
+struct VistleCerr {
+    std::ostringstream oss;
+    ~VistleCerr()
+    {
+        int rank = 0;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        if (rank == 0) {
+            std::cerr << oss.str();
+        }
+    }
+    template<typename T>
+    VistleCerr &operator<<(const T &val)
+    {
+        oss << val;
+        return *this;
+    }
+    // Support std::endl and other manipulators
+    VistleCerr &operator<<(std::ostream &(*manip)(std::ostream &))
+    {
+        oss << manip;
+        return *this;
+    }
+};
+
 static ConnectionParams connectionParams;
 
 
@@ -52,7 +76,7 @@ void parseParam(const conduit_cpp::Node &params, T *target, const std::string &p
     try {
         *target = (params[path].*member)();
     } catch (const std::exception &e) {
-        std::cerr << "parameter " << path << " is not specified, defaulting to " << *target << "!" << std::endl;
+        VistleCerr() << "parameter " << path << " is not specified, defaulting to " << *target << "!" << std::endl;
     }
 }
 
@@ -100,6 +124,46 @@ vistle::Object::ptr getMesh(const conduit_cpp::Node &mesh, float time, int times
     return vistleMesh;
 }
 
+void testConduit()
+{
+    VistleCerr() << "Testing Conduit..." << std::endl;
+    auto mesh = conduit_cpp::Node();
+    mesh["coordsets/coords/type"] = "explicit";
+    if (mesh.has_child("coordsets/coords/type")) {
+        VistleCerr() << "mesh has coordsets. " << mesh["coordsets/coords/type"].to_yaml() << std::endl;
+    } else {
+        VistleCerr() << "mesh does not have coordsets." << std::endl;
+    }
+    VistleCerr() << "printing anyway " << mesh["coordsets/coords/type"].to_yaml() << std::endl;
+}
+
+bool checkMesh(const conduit_cpp::Node &mesh)
+{
+    auto type = mesh["type"].as_string(); // Currently, the only supported value is mesh (no multimesh).
+    if (type != "mesh") {
+        VistleCerr() << mesh.name() << " has unsupported type " << type << std::endl;
+        return false;
+    }
+
+    if (!mesh.has_path("coordsets/coords/values/x")) {
+        VistleCerr() << mesh.name() << ": no coordinates found, skipping channel." << std::endl;
+        return false;
+    }
+    if (!mesh.has_path("topologies/mesh/type")) {
+        VistleCerr() << mesh.name() << ": no topology found, skipping channel." << std::endl;
+        return false;
+    }
+    conduit_cpp::Node info;
+    bool is_valid = conduit_cpp::Blueprint::verify("mesh", mesh, info);
+    if (!is_valid) {
+        VistleCerr() << mesh.name() << " is not a valid mesh; skipping channel." << std::endl;
+        VistleCerr() << info.to_yaml() << std::endl;
+        return false;
+    }
+    VistleCerr() << mesh.name() << " is a valid mesh;" << std::endl;
+    return true;
+}
+
 /**
    * Execute per timestep.
    * Following the ParaView execute protocol
@@ -108,45 +172,43 @@ vistle::Object::ptr getMesh(const conduit_cpp::Node &mesh, float time, int times
 enum catalyst_status catalyst_execute_vistle(const conduit_node *cparams)
 {
     const conduit_cpp::Node params = conduit_cpp::cpp_node(const_cast<conduit_node *>(cparams));
-    auto cycle =
-        params["time/timestep/cycle"].to_int(); // this defines temporal information about the current invocation.
-    auto catalystNode = params["catalyst"];
-    int timestep = cycle;
-    if (catalystNode.has_child("state/timestep"))
+    int timestep = -1;
+    if (params.has_path("time/timestep/cycle")) {
+        // std::cerr << "catalyst time/timestep/cycle found: " << catalystNode["time/timestep/cycle"].to_int() << std::endl;
         timestep =
-            catalystNode["state/timestep"]
+            params["time/timestep/cycle"].to_int(); // this defines temporal information about the current invocation.
+    }
+    if (params.has_path("state/timestep")) {
+        // std::cerr << "catalyst state timestep found: " << params["state/timestep"].to_int() << std::endl;
+        timestep =
+            params["state/timestep"]
                 .to_int(); // (optional) integral value for current timestep. if not specified, catalyst/cycle is used.
-
+    }
+    assert(timestep >= 0);
     float time = 0.0;
-    if (catalystNode.has_child("state/time"))
-        time = catalystNode["state/time"]
+    if (params.has_child("state/time"))
+        time = params["state/time"]
                    .to_float64(); // (optional) float64 value for current time, if not specified, 0.0 is assumed.
     // auto parameters = params["catalyst/state/parameters"].as_string(); // (optional) list of optional runtime parameters. If present, they must be of type list with each child node of type string.
     // auto multiblock = params["catalyst/state/multiblock"].as_int(); // (optional) integral value. When present and set to 1, output will be a legacy vtkMultiBlockDataSet.
 
     vistle::insitu::MetaData metaData;
+    auto catalystNode = params["catalyst"];
     if (!catalystNode.has_child("channels")) {
-        std::cerr << "no channels found" << std::endl;
+        VistleCerr() << "no channels found" << std::endl;
         return catalyst_status_ok;
     }
     auto channels = catalystNode["channels"];
     for (conduit_index_t i = 0; i < channels.number_of_children(); i++) {
         auto mesh = channels.child(i);
-        auto type = mesh["type"].as_string(); // Currently, the only supported value is mesh (no multimesh).
-        if (type != "mesh") {
-            std::cerr << mesh.name() << ": unsupported channel type: " << type << std::endl;
+        if (!checkMesh(mesh))
             continue;
-        }
-        conduit_cpp::Node info;
-        bool is_valid = conduit_cpp::Blueprint::verify("mesh", mesh, info);
-        if (!is_valid) {
-            std::cerr << "'data' on channel '" << mesh.name() << "' is not a valid 'mesh'; skipping channel."
-                      << std::endl;
-            continue;
-        }
+
+
         vistle::insitu::MetaMesh metaMesh(mesh.name());
 
         auto fields = mesh["fields"];
+        std::cerr << "mesh " << mesh.name() << " has " << fields.number_of_children() << " fields." << std::endl;
         for (conduit_index_t fieldNum = 0; fieldNum < fields.number_of_children(); fieldNum++) {
             auto field = fields.child(fieldNum);
             metaMesh.addVar(field.name());
@@ -154,33 +216,32 @@ enum catalyst_status catalyst_execute_vistle(const conduit_node *cparams)
         metaData.addMesh(metaMesh);
     }
 
-
-    vistle::insitu::ObjectRetriever cbs{[&](const vistle::insitu::MetaData &usedData) {
-        vistle::insitu::ObjectRetriever::PortAssignedObjectList objects;
-        for (const auto &requestedMesh: usedData) {
-            auto mesh = params["catalyst/channels/" + requestedMesh.name()];
-            auto vistleMesh =
-                (connectionParams.dynamicGrid || cachedMeshes.find(requestedMesh.name()) == cachedMeshes.end())
-                    ? getMesh(mesh, time, timestep)
-                    : cachedMeshes[requestedMesh.name()];
-
-            objects.push_back(vistle::insitu::ObjectRetriever::PortAssignedObject(requestedMesh.name(), vistleMesh));
-            for (const auto &requestedField: requestedMesh) {
-                auto field = mesh["fields/" + requestedField];
-                auto data = conduitDataToVistle(field);
-                data->setRealTime(time);
-                data->setGrid(vistleMesh);
-                data->setTimestep(timestep);
-                adapter->updateMeta(data);
-                objects.push_back(
-                    vistle::insitu::ObjectRetriever::PortAssignedObject(requestedMesh.name(), requestedField, data));
-            }
-        }
-        return objects;
-    }};
-
     //initialize Vistle
     if (!adapter) {
+        vistle::insitu::ObjectRetriever cbs{[&](const vistle::insitu::MetaData &usedData) {
+            vistle::insitu::ObjectRetriever::PortAssignedObjectList objects;
+            for (const auto &requestedMesh: usedData) {
+                auto mesh = params["catalyst/channels/" + requestedMesh.name()];
+                auto vistleMesh =
+                    (connectionParams.dynamicGrid || cachedMeshes.find(requestedMesh.name()) == cachedMeshes.end())
+                        ? getMesh(mesh, time, timestep)
+                        : cachedMeshes[requestedMesh.name()];
+
+                objects.push_back(
+                    vistle::insitu::ObjectRetriever::PortAssignedObject(requestedMesh.name(), vistleMesh));
+                for (const auto &requestedField: requestedMesh) {
+                    auto field = mesh["fields/" + requestedField];
+                    auto data = conduitDataToVistle(field);
+                    data->setRealTime(time);
+                    data->setGrid(vistleMesh);
+                    data->setTimestep(timestep);
+                    adapter->updateMeta(data);
+                    objects.push_back(vistle::insitu::ObjectRetriever::PortAssignedObject(requestedMesh.name(),
+                                                                                          requestedField, data));
+                }
+            }
+            return objects;
+        }};
         adapter.reset(new vistle::insitu::Adapter(connectionParams.paused, connectionParams.comm, std::move(metaData),
                                                   cbs, VISTLE_ROOT, VISTLE_BUILD_TYPE, connectionParams.launchOptions));
     }

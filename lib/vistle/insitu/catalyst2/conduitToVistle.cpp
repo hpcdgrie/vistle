@@ -27,11 +27,29 @@ std::array<vistle::Index, 3> getDims(const conduit_cpp::Node &dims)
 
 void getCoord(const conduit_cpp::Node &coord, Scalar *out)
 {
-    assert(coord.dtype().is_float());
-    const float *data = static_cast<const float *>(coord.data_ptr());
-    auto dt = coord.dtype();
-    for (conduit_index_t i = 0; i < coord.number_of_elements(); i++) {
-        out[i] = data[(dt.offset() + i * dt.stride()) / dt.element_bytes()];
+    auto dtype = coord.dtype();
+    if (!(dtype.is_float() || dtype.is_double())) {
+        std::cerr << "getCoord: expected float or double, got " << dtype.name() << std::endl;
+        return;
+    }
+
+    if (!(dtype.is_float() || dtype.is_double())) {
+        std::cerr << "getCoord: expected float or double, got " << dtype.name() << std::endl;
+        return;
+    }
+
+    auto numElements = coord.number_of_elements();
+
+    auto copyWithType = [&](auto *typedPtr) {
+        for (conduit_index_t i = 0; i < numElements; i++) {
+            out[i] = static_cast<Scalar>(typedPtr[(dtype.offset() + i * dtype.stride()) / dtype.element_bytes()]);
+        }
+    };
+
+    if (dtype.is_double()) {
+        copyWithType(static_cast<const double *>(coord.data_ptr()));
+    } else if (dtype.is_float()) {
+        copyWithType(static_cast<const float *>(coord.data_ptr()));
     }
 }
 
@@ -221,7 +239,7 @@ vistle::DataBase::ptr conduitDataToVistle(const conduit_cpp::Node &field)
         }
     } else {
         auto vec = std::make_shared<vistle::Vec<vistle::Scalar, 1>>((size_t)values["x"].dtype().number_of_elements());
-        getCoord(values, vec->x().data());
+        getCoord(values["x"], vec->x().data());
         vec->setMapping(mapping);
         vec->addAttribute(attribute::Species, field.name());
         return vec;
