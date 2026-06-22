@@ -10,8 +10,8 @@
 #include <cover/ui/Menu.h>
 #include <osg/Matrix>
 #include <osg/Vec3>
-#include <PluginUtil/coVR3DTransInteractor.h>
-#include <PluginUtil/coVR3DTransformInteractor.h>
+#include <cover/interactors/coVR3DTransInteractor.h>
+#include <cover/interactors/coVR3DTransformInteractor.h>
 
 using namespace opencover;
 
