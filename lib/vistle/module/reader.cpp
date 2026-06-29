@@ -370,6 +370,12 @@ bool Reader::compute()
     return true;
 }
 
+void Reader::updateMeta(vistle::Object::ptr object) const
+{
+    object->addAttribute(attribute::DatasetName, m_datasetName);
+    Module::updateMeta(object);
+}
+
 bool Reader::prepareRead()
 {
     return true;
@@ -509,8 +515,8 @@ bool Reader::changeParameter(const Parameter *param)
             val = val.substr(slash + 1);
         }
         auto dot = val.find('.');
-        val = val.substr(0, dot);
-        setItemInfo(val);
+        m_datasetName = val.substr(0, dot);
+        setItemInfo(m_datasetName);
     }
 
     bool ret = Module::changeParameter(param);
