@@ -30,7 +30,7 @@
 #include <cover/ui/Button.h>
 #include <cover/ui/SelectionList.h>
 #include <cover/ui/Slider.h>
-#include <PluginUtil/coVR3DTransInteractor.h>
+#include <cover/interactors/coVR3DTransInteractor.h>
 
 #include <algorithm>
 #include <cmath>
