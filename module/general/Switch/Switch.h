@@ -11,7 +11,12 @@ public:
     Switch(const std::string &name, int moduleID, mpi::communicator comm);
 
 private:
+    bool changeParameter(const vistle::Parameter *p) override;
     bool objectAdded(int sender, const std::string &senderPort, const vistle::Port *port) override;
+    bool compute() override;
+    void connectionAdded(const vistle::Port *from, const vistle::Port *to) override;
+    void connectionRemoved(const vistle::Port *from, const vistle::Port *to) override;
+    void connectionChanged(const vistle::Port *to, const std::string &newDispalyName);
 
     vistle::IntParameter *m_choice;
     std::array<vistle::Port *, NumPorts> m_inputs;
