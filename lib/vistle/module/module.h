@@ -160,6 +160,7 @@ public:
     bool destroyPort(const std::string &portName);
     bool destroyPort(const Port *port);
     bool setPortState(const Port *port, message::ItemInfo::PortState state);
+    void setPortFlags(Port *port, Port::Flags flags);
     bool linkPorts(const Port *input, const Port *output); //< make output depend on input
     void setPortOptional(const Port *port,
                          bool optional = true); //< set port as optional, i.e. module can run without it being connected

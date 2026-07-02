@@ -978,6 +978,14 @@ bool Module::setPortState(const Port *port, message::ItemInfo::PortState state)
     return true;
 }
 
+void Module::setPortFlags(Port *port, Port::Flags flags)
+{
+    assert(port);
+    port->setFlags(flags);
+    message::ChangePortFlags msg(*port, flags);
+    sendMessage(msg);
+}
+
 bool Module::addObject(const std::string &portName, vistle::Object::const_ptr object)
 {
     auto *p = findOutputPort(portName);
