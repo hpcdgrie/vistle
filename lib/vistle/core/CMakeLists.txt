@@ -10,10 +10,10 @@ set(core_SOURCES
     archives.cpp
     availablemodule.cpp
     cellalgorithm.cpp
+    envelope.cpp
     filequery.cpp
     geometry.cpp
     message.cpp
-    messagepayload.cpp
     messagequeue.cpp
     messagerouter.cpp
     messages.cpp
@@ -26,6 +26,7 @@ set(core_SOURCES
     port.cpp
     porttracker.cpp
     shm_array.cpp
+    shmenvelope.cpp
     shm_obj_ref.cpp
     shm_reference.cpp
     shm.cpp
@@ -84,6 +85,7 @@ set(core_HEADERS
     dimensions.h
     empty_impl.h
     empty.h
+    envelope.h
     export.h
     filequery.h
     geometry.h
@@ -135,6 +137,7 @@ set(core_HEADERS
     shm_array_impl.h
     shm_array.h
     shm_config.h
+    shmenvelope.h
     shm_impl.h
     shm_obj_ref_impl.h
     shm_obj_ref.h
