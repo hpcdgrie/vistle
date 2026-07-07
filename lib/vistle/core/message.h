@@ -335,7 +335,8 @@ public:
         assert(m->type() == SomeMessage::s_type);
         return *m;
     }
-
+    bool addPayload(const buffer *payload);
+    const char *getPayload() const;
     size_t bufferSize() const { return Message::MESSAGE_SIZE; }
     size_t size() const { return Message::size(); }
     char *data() { return static_cast<char *>(static_cast<void *>(this)); }
