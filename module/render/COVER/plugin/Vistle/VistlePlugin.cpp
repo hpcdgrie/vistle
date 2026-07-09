@@ -8,7 +8,6 @@
 #include <cover/OpenCOVER.h>
 #include <PluginUtil/PluginMessageTypes.h>
 
-#include <VistlePluginUtil/VistleMessage.h>
 #include <VistlePluginUtil/VistleInfo.h>
 #include <VistlePluginUtil/VistleInteractor.h>
 
@@ -640,7 +639,7 @@ void VistlePlugin::requestQuit(bool killSession)
 void VistlePlugin::message(int toWhom, int type, int length, const void *data)
 {
     if (type == opencover::PluginMessageTypes::VistleMessageOut) {
-        const auto *wrap = static_cast<const VistleMessage *>(data);
+        const auto *wrap = static_cast<const MessageWithPayload *>(data);
         if (m_module) {
             m_module->sendMessage(wrap->buf, wrap->payload);
         }

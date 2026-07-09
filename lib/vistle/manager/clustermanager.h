@@ -158,13 +158,6 @@ private:
     const int m_rank;
     const int m_size;
 
-    struct MessageWithPayload {
-        MessageWithPayload(const message::Buffer &buf, const MessagePayload &pl = MessagePayload())
-        : buf(buf), payload(pl)
-        {}
-        message::Buffer buf;
-        MessagePayload payload;
-    };
     std::mutex m_incomingMutex;
     std::deque<MessageWithPayload> m_incomingMessages;
 

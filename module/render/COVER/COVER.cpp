@@ -28,7 +28,6 @@
 
 #include <VistlePluginUtil/VistleRenderObject.h>
 #include <VistlePluginUtil/VistleInteractor.h>
-#include <VistlePluginUtil/VistleMessage.h>
 #include "VistleGeometryGenerator.h"
 #include "CoverConfigBridge.h"
 #include "vistle/renderer/renderer.h"
@@ -962,7 +961,7 @@ bool COVER::handleMessage(const message::Message *message, const MessagePayload 
 {
     switch (message->type()) {
     case vistle::message::REMOTERENDERING: {
-        VistleMessage wrap(*message, payload);
+        MessageWithPayload wrap(*message, payload);
         coVRPluginList::instance()->message(0, opencover::PluginMessageTypes::VistleMessageIn, sizeof(wrap), &wrap);
         return true;
     }

@@ -48,7 +48,6 @@
 #include <vistle/core/statetracker.h>
 
 #include <VistlePluginUtil/VistleInteractor.h>
-#include <VistlePluginUtil/VistleMessage.h>
 #include <VistlePluginUtil/VistleInfo.h>
 
 

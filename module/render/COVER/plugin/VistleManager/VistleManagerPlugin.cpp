@@ -10,14 +10,13 @@
 #include <cover/coVRMSController.h>
 #include <PluginUtil/PluginMessageTypes.h>
 
-#include <VistlePluginUtil/VistleMessage.h>
-
 #include <COVER.h>
 
 // vistle
 #include <vistle/util/exception.h>
 #include <vistle/util/threadname.h>
 #include <vistle/core/statetracker.h>
+#include <vistle/core/messagewithpayload.h>
 #include <vistle/control/vistleurl.h>
 
 #include <vistle/manager/manager.h>
