@@ -1427,9 +1427,16 @@ bool Module::dispatch(bool block, bool *messageReceived, unsigned int minPrio)
             *messageReceived = true;
 
         MessagePayload pl;
-        if (buf.payloadSize() > 0) {
-            pl = Shm::the().getArrayFromName<char>(buf.payloadName());
-            pl.unref();
+        const char *payload = nullptr;
+        size_t payloadSize = buf.payloadSize();
+        if (payloadSize > 0) {
+            if (auto plInBuf = buf.getPayload()) {
+                payload = plInBuf;
+            } else {
+                pl = Shm::the().getArrayFromName<char>(buf.payloadName());
+                pl.unref();
+                payload = pl->data();
+            }
         }
 
         if (syncMessageProcessing()) {
@@ -1445,7 +1452,7 @@ bool Module::dispatch(bool block, bool *messageReceived, unsigned int minPrio)
             do {
                 sync = needsSync(buf) ? buf.type() : 0;
 
-                again &= handleMessage(&buf, pl);
+                again &= handleMessage(MessageWithPayload(buf, pl));
                 if (!again) {
                     CERR << "collective, quitting after " << buf << std::endl;
                 }
@@ -1462,7 +1469,7 @@ bool Module::dispatch(bool block, bool *messageReceived, unsigned int minPrio)
 
             } while (allsync && !sync);
         } else {
-            again &= handleMessage(&buf, pl);
+            again &= handleMessage(MessageWithPayload(buf, pl));
             if (!again) {
                 CERR << "quitting after " << buf << std::endl;
             }
@@ -1503,12 +1510,14 @@ bool Module::sendMessage(const message::Message &message, const buffer *payload)
     if (rank() == 0 || message::Router::the().toRank0(message)) {
         message::Buffer buf(message);
         if (payload) {
-            MessagePayload pl;
-            pl.construct(payload->size());
-            memcpy(pl->data(), payload->data(), payload->size());
-            pl.ref();
-            buf.setPayloadName(pl.name());
-            buf.setPayloadSize(payload->size());
+            if (!buf.addPayload(payload)) {
+                MessagePayload pl;
+                pl.construct(payload->size());
+                memcpy(pl->data(), payload->data(), payload->size());
+                pl.ref();
+                buf.setPayloadName(pl.name());
+                buf.setPayloadSize(payload->size());
+            }
         }
 #ifdef MODULE_THREAD
         buf.setSenderId(id());
@@ -1547,41 +1556,42 @@ bool Module::sendMessage(const message::Message &message, const MessagePayload &
     return true;
 }
 
-bool Module::handleMessage(const vistle::message::Message *message, const MessagePayload &payload)
+bool Module::handleMessage(const vistle::MessageWithPayload &vistleMsg)
 {
     using namespace vistle::message;
 
-    if (message->payloadSize() > 0) {
-        assert(payload);
-    }
+    const auto &message = vistleMsg.buf;
+    size_t payloadSize = message.payloadSize();
+    const char *payload = vistleMsg.getPayload();
+
 
     if (payload)
-        m_stateTracker->handle(*message, payload->data(), payload->size());
+        m_stateTracker->handle(vistleMsg.buf, payload, payloadSize);
     else
-        m_stateTracker->handle(*message, nullptr);
+        m_stateTracker->handle(vistleMsg.buf, nullptr);
 
-    if (m_traceMessages == message::ANY || message->type() == m_traceMessages) {
-        CERR << "RECV: " << *message << std::endl;
+    if (m_traceMessages == message::ANY || message.type() == m_traceMessages) {
+        CERR << "RECV: " << message << std::endl;
     }
 
-    switch (message->type()) {
+    switch (message.type()) {
     case vistle::message::TRACE: {
-        const Trace *trace = static_cast<const Trace *>(message);
-        if (trace->destId() == id() || trace->destId() == message::Id::Broadcast) {
-            if (trace->on()) {
-                m_traceMessages = trace->messageType();
+        auto &trace = message.as<Trace>();
+        if (trace.destId() == id() || trace.destId() == message::Id::Broadcast) {
+            if (trace.on()) {
+                m_traceMessages = trace.messageType();
             } else {
                 m_traceMessages = message::INVALID;
             }
 
             std::cerr << "    module [" << name() << "] [" << id() << "] [" << rank() << "/" << size() << "] trace ["
-                      << trace->on() << "]" << std::endl;
+                      << trace.on() << "]" << std::endl;
         }
         break;
     }
 
     case message::QUIT: {
-        const message::Quit *quit = static_cast<const message::Quit *>(message);
+        auto &quit = message.as<message::Quit>();
         //TODO: uuid should be included in corresponding ModuleExit message
         (void)quit;
         return false;
@@ -1589,20 +1599,20 @@ bool Module::handleMessage(const vistle::message::Message *message, const Messag
     }
 
     case message::KILL: {
-        const message::Kill *kill = static_cast<const message::Kill *>(message);
+        auto &kill = message.as<message::Kill>();
         //TODO: uuid should be included in corresponding ModuleExit message
-        if (kill->getModule() == id() || kill->getModule() == message::Id::Broadcast) {
+        if (kill.getModule() == id() || kill.getModule() == message::Id::Broadcast) {
             return false;
         } else {
             std::cerr << "module [" << name() << "] [" << id() << "] [" << rank() << "/" << size() << "]"
-                      << ": received invalid Kill message: " << *kill << std::endl;
+                      << ": received invalid Kill message: " << kill << std::endl;
         }
         break;
     }
 
     case message::ADDPORT: {
-        const message::AddPort *cp = static_cast<const message::AddPort *>(message);
-        Port port = cp->getPort();
+        auto &cp = message.as<message::AddPort>();
+        Port port = cp.getPort();
         std::string name = port.getName();
         std::string::size_type p = name.find('[');
         std::string basename = name;
@@ -1641,13 +1651,13 @@ bool Module::handleMessage(const vistle::message::Message *message, const Messag
         }
         if (newport) {
             message::AddPort np(*newport);
-            np.setReferrer(cp->uuid());
+            np.setReferrer(cp.uuid());
             sendMessage(np);
             const Port::PortSet &links = newport->linkedPorts();
             for (Port::PortSet::iterator it = links.begin(); it != links.end(); ++it) {
                 const Port *p = *it;
                 message::AddPort linked(*p);
-                linked.setReferrer(cp->uuid());
+                linked.setReferrer(cp.uuid());
                 sendMessage(linked);
             }
         }
@@ -1655,27 +1665,27 @@ bool Module::handleMessage(const vistle::message::Message *message, const Messag
     }
 
     case message::CONNECT: {
-        const message::Connect *conn = static_cast<const message::Connect *>(message);
+        auto &conn = message.as<message::Connect>();
         Port *port = NULL;
         Port *other = NULL;
         const Port::ConstPortSet *ports = NULL;
         std::string ownPortName;
         bool inputConnection = false;
         //CERR << name() << " receiving connection: " << conn->getModuleA() << ":" << conn->getPortAName() << " -> " << conn->getModuleB() << ":" << conn->getPortBName() << std::endl;
-        if (conn->getModuleA() == id()) {
-            port = findOutputPort(conn->getPortAName());
-            ownPortName = conn->getPortAName();
+        if (conn.getModuleA() == id()) {
+            port = findOutputPort(conn.getPortAName());
+            ownPortName = conn.getPortAName();
             if (port) {
-                other = new Port(conn->getModuleB(), conn->getPortBName(), Port::INPUT);
+                other = new Port(conn.getModuleB(), conn.getPortBName(), Port::INPUT);
                 ports = &port->connections();
             }
 
-        } else if (conn->getModuleB() == id()) {
-            ownPortName = conn->getPortBName();
-            port = findInputPort(conn->getPortBName());
+        } else if (conn.getModuleB() == id()) {
+            ownPortName = conn.getPortBName();
+            port = findInputPort(conn.getPortBName());
             inputConnection = true;
             if (port) {
-                other = new Port(conn->getModuleA(), conn->getPortAName(), Port::OUTPUT);
+                other = new Port(conn.getModuleA(), conn.getPortAName(), Port::OUTPUT);
                 ports = &port->connections();
             }
         } else {
@@ -1707,23 +1717,23 @@ bool Module::handleMessage(const vistle::message::Message *message, const Messag
     }
 
     case message::DISCONNECT: {
-        const message::Disconnect *disc = static_cast<const message::Disconnect *>(message);
+        auto &disc = message.as<message::Disconnect>();
         Port *port = NULL;
         Port *other = NULL;
         const Port::ConstPortSet *ports = NULL;
         bool inputConnection = false;
-        if (disc->getModuleA() == id()) {
-            port = findOutputPort(disc->getPortAName());
+        if (disc.getModuleA() == id()) {
+            port = findOutputPort(disc.getPortAName());
             if (port) {
-                other = new Port(disc->getModuleB(), disc->getPortBName(), Port::INPUT);
+                other = new Port(disc.getModuleB(), disc.getPortBName(), Port::INPUT);
                 ports = &port->connections();
             }
 
-        } else if (disc->getModuleB() == id()) {
-            port = findInputPort(disc->getPortBName());
+        } else if (disc.getModuleB() == id()) {
+            port = findInputPort(disc.getPortBName());
             inputConnection = true;
             if (port) {
-                other = new Port(disc->getModuleA(), disc->getPortAName(), Port::OUTPUT);
+                other = new Port(disc.getModuleA(), disc.getPortAName(), Port::OUTPUT);
                 ports = &port->connections();
             }
         }
@@ -1745,26 +1755,26 @@ bool Module::handleMessage(const vistle::message::Message *message, const Messag
     }
 
     case message::EXECUTE: {
-        const Execute *exec = static_cast<const Execute *>(message);
-        return handleExecute(exec);
+        auto &exec = message.as<Execute>();
+        return handleExecute(&exec);
         break;
     }
 
     case message::ADDOBJECT: {
-        const message::AddObject *add = static_cast<const message::AddObject *>(message);
-        auto obj = add->takeObject();
-        const Port *p = findInputPort(add->getDestPort());
+        auto &add = message.as<message::AddObject>();
+        auto obj = add.takeObject();
+        const Port *p = findInputPort(add.getDestPort());
         if (!p) {
-            CERR << "unknown input port " << add->getDestPort() << " in AddObject" << std::endl;
+            CERR << "unknown input port " << add.getDestPort() << " in AddObject" << std::endl;
             return true;
         }
         if (!obj) {
-            CERR << "did not find object " << add->objectName() << " for port " << add->getDestPort() << " in AddObject"
+            CERR << "did not find object " << add.objectName() << " for port " << add.getDestPort() << " in AddObject"
                  << std::endl;
         }
-        addInputObject(add->senderId(), add->getSenderPort(), add->getDestPort(), obj);
-        if (!objectAdded(add->senderId(), add->getSenderPort(), p)) {
-            CERR << "error in objectAdded(" << add->getSenderPort() << ")" << std::endl;
+        addInputObject(add.senderId(), add.getSenderPort(), add.getDestPort(), obj);
+        if (!objectAdded(add.senderId(), add.getSenderPort(), p)) {
+            CERR << "error in objectAdded(" << add.getSenderPort() << ")" << std::endl;
             return false;
         }
 
@@ -1772,20 +1782,20 @@ bool Module::handleMessage(const vistle::message::Message *message, const Messag
     }
 
     case message::SETPARAMETER: {
-        const message::SetParameter *param = static_cast<const message::SetParameter *>(message);
+        auto &param = message.as<message::SetParameter>();
 
-        if (param->destId() == id()) {
-            ParameterManager::handleMessage(*param);
+        if (param.destId() == id()) {
+            ParameterManager::handleMessage(param);
         } else {
             // notification of controller about current value happens in set...Parameter
-            parameterChanged(param->getModule(), param->getName(), *param);
+            parameterChanged(param.getModule(), param.getName(), param);
         }
         break;
     }
 
     case message::SETPARAMETERCHOICES: {
-        const message::SetParameterChoices *choices = static_cast<const message::SetParameterChoices *>(message);
-        if (choices->senderId() != id()) {
+        auto &choices = message.as<message::SetParameterChoices>();
+        if (choices.senderId() != id()) {
             //FIXME: handle somehow
             //parameterChangedWrapper(choices->senderId(), choices->getName());
         }
@@ -1793,22 +1803,22 @@ bool Module::handleMessage(const vistle::message::Message *message, const Messag
     }
 
     case message::ADDPARAMETER: {
-        const message::AddParameter *param = static_cast<const message::AddParameter *>(message);
+        auto &param = message.as<message::AddParameter>();
 
-        parameterAdded(param->senderId(), param->getName(), *param, param->moduleName());
+        parameterAdded(param.senderId(), param.getName(), param, param.moduleName());
         break;
     }
 
     case message::REMOVEPARAMETER: {
-        const message::RemoveParameter *param = static_cast<const message::RemoveParameter *>(message);
+        auto &param = message.as<message::RemoveParameter>();
 
-        parameterRemoved(param->senderId(), param->getName(), *param);
+        parameterRemoved(param.senderId(), param.getName(), param);
         break;
     }
 
     case message::BARRIER: {
-        const message::Barrier *barrier = static_cast<const message::Barrier *>(message);
-        message::BarrierReached reached(barrier->uuid());
+        auto &barrier = message.as<message::Barrier>();
+        message::BarrierReached reached(barrier.uuid());
         reached.setDestId(Id::LocalManager);
         if (m_upstreamIsExecuting) {
             m_delayedBarrierResponse = std::make_unique<vistle::message::Buffer>(reached);
@@ -1820,7 +1830,7 @@ bool Module::handleMessage(const vistle::message::Message *message, const Messag
 
     case message::CANCELEXECUTE:
         // not relevant if not within prepare/compute/reduce
-        cancelExecuteMessageReceived(message);
+        cancelExecuteMessageReceived(&message.as<message::CancelExecute>());
         break;
 
     case message::MODULEEXIT:
@@ -1841,7 +1851,7 @@ bool Module::handleMessage(const vistle::message::Message *message, const Messag
         break;
 
     default:
-        CERR << "unknown message type [" << message->type() << "]: " << *message << std::endl;
+        CERR << "unknown message type [" << message.type() << "]: " << message << std::endl;
 
         break;
     }

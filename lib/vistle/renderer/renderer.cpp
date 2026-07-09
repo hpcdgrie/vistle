@@ -79,32 +79,36 @@ std::array<Object::const_ptr, 3> splitObject(Object::const_ptr container)
     return geo_norm_data;
 }
 
-bool Renderer::handleMessage(const message::Message *message, const MessagePayload &payload)
+bool Renderer::handleMessage(const vistle::MessageWithPayload &vistleMsg)
 {
-    switch (message->type()) {
+    const message::Buffer &buf = vistleMsg.buf;
+    size_t payloadSize = buf.payloadSize();
+    const char *payload = vistleMsg.getPayload();
+
+    switch (buf.type()) {
     case vistle::message::REPLAYFINISHED: {
         m_replayFinished = true;
         break;
     }
     case vistle::message::ADDOBJECT: {
-        auto add = static_cast<const message::AddObject *>(message);
+        auto &add = buf.as<message::AddObject>();
         if (payload)
-            m_stateTracker->handle(*add, payload->data(), payload->size());
+            m_stateTracker->handle(add, payload, payloadSize);
         else
-            m_stateTracker->handle(*add, nullptr);
-        return handleAddObject(*add);
+            m_stateTracker->handle(add, nullptr);
+        return handleAddObject(add);
         break;
     }
     case vistle::message::COLORMAP: {
-        const auto &m = static_cast<const message::Colormap *>(message);
-        auto plbuf = vistle::buffer(payload->data(), payload->data() + payload->size());
+        auto &m = buf.as<message::Colormap>();
+        auto plbuf = vistle::buffer(payload, payload + payloadSize);
         auto pl = message::getPayload<message::Colormap::Payload>(plbuf);
-        addColorMap(*m, pl.rgba);
+        addColorMap(m, pl.rgba);
         break;
     }
     case vistle::message::REMOVECOLORMAP: {
-        const auto &m = static_cast<const message::RemoveColormap *>(message);
-        removeColorMap(m->species());
+        auto &m = buf.as<message::RemoveColormap>();
+        removeColorMap(m.species());
         break;
     }
     default: {
@@ -112,7 +116,7 @@ bool Renderer::handleMessage(const message::Message *message, const MessagePaylo
     }
     }
 
-    return Module::handleMessage(message, payload);
+    return Module::handleMessage(vistleMsg);
 }
 
 bool Renderer::addColorMap(const vistle::message::Colormap &cm, std::vector<vistle::RGBA> &rgba)
@@ -244,11 +248,11 @@ bool Renderer::dispatch(bool block, bool *messageReceived, unsigned int minPrio)
                 }
 
                 MessagePayload pl;
-                if (buf.payloadSize() > 0) {
+                if (buf.payloadSize() > 0 && !buf.getPayload()) {
                     pl = Shm::the().getArrayFromName<char>(buf.payloadName());
                     pl.unref();
                 }
-                quit = handleMessage(&message, pl) ? 0 : 1;
+                quit = !handleMessage(MessageWithPayload(message, pl));
                 if (quit) {
                     std::cerr << "Quitting: " << message << std::endl;
                     break;

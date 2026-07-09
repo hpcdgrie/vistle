@@ -90,7 +90,7 @@ bool VistleManagerPlugin::sendVistle(const vistle::message::Message &msg, const 
     std::cerr << "sending " << buf << std::endl;
     //std::unique_lock<Communicator> guard(Communicator::the());
     //return Communicator::the().sendMessage(vistle::message::Id::Broadcast, buf, -1, payload);
-    return Communicator::the().sendHub(buf, payload);
+    return vistle::Communicator::the().sendHub(vistle::MessageWithPayload(msg, payload));
 }
 
 template<class Payload>
@@ -296,7 +296,7 @@ void VistleManagerPlugin::requestQuit(bool killSession)
 void VistleManagerPlugin::message(int toWhom, int type, int length, const void *data)
 {
     if (type == opencover::PluginMessageTypes::VistleMessageOut) {
-        const auto *wrap = static_cast<const VistleMessage *>(data);
+        const auto *wrap = static_cast<const MessageWithPayload *>(data);
         sendVistle(wrap->buf, wrap->payload);
     }
 }

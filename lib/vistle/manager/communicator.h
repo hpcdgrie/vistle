@@ -10,6 +10,7 @@
 
 #include <vistle/core/message.h>
 #include <vistle/core/messagepayload.h>
+#include <vistle/core/messagewithpayload.h>
 #include <vistle/core/availablemodule.h>
 
 #include "export.h"
@@ -42,11 +43,10 @@ public:
     bool dispatch(bool *work);
     void terminate();
     bool handleMessage(const message::Buffer &message, const MessagePayload &payload = MessagePayload());
-    bool forwardToMaster(const message::Message &message, const vistle::MessagePayload &payload = MessagePayload());
-    bool broadcastAndHandleMessage(const message::Message &message, const MessagePayload &payload = MessagePayload());
-    bool sendMessage(int receiver, const message::Message &message, int rank = -1,
-                     const MessagePayload &payload = MessagePayload());
-    bool sendHub(const message::Message &message, const MessagePayload &payload = MessagePayload());
+    bool forwardToMaster(const MessageWithPayload &message);
+    bool broadcastAndHandleMessage(const MessageWithPayload &message);
+    bool sendMessage(int receiver, const MessageWithPayload &message, int rank = -1);
+    bool sendHub(const MessageWithPayload &message);
 
     int hubId() const;
     int getRank() const;
@@ -94,7 +94,7 @@ private:
         bool testComplete();
     };
     std::set<std::shared_ptr<SendRequest>> m_ongoingSends;
-    bool startSend(int destRank, const message::Message &message, const MessagePayload &payload);
+    bool startSend(int destRank, const MessageWithPayload &message);
 
     static Communicator *s_singleton;
 

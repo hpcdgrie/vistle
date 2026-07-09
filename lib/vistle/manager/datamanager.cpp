@@ -752,7 +752,7 @@ void DataManager::updateStatus()
     if (m_rank == 0)
         Communicator::the().handleMessage(m);
     else
-        Communicator::the().forwardToMaster(m);
+        Communicator::the().forwardToMaster(MessageWithPayload(m));
 }
 
 bool DataManager::notifyTransferComplete(const message::AddObject &addObj)
@@ -767,7 +767,7 @@ bool DataManager::notifyTransferComplete(const message::AddObject &addObj)
     complete.setDestId(hub);
     complete.setDestRank(addObj.rank());
     //return Communicator::the().clusterManager().sendMessage(hub, complete, addObj.rank());
-    return Communicator::the().sendHub(complete);
+    return Communicator::the().sendHub(MessageWithPayload(complete));
     //return send(complete);
 }
 

@@ -735,11 +735,11 @@ void ParallelRemoteRenderManager::removeObject(std::shared_ptr<RenderObject> ro)
         rhr->updateModificationCount();
 }
 
-bool ParallelRemoteRenderManager::handleMessage(const message::Message *message, const MessagePayload &payload)
+bool ParallelRemoteRenderManager::handleMessage(const vistle::MessageWithPayload &msg)
 {
     auto rhr = m_rhrControl.server();
     if (rhr)
-        return rhr->handleMessage(message, payload);
+        return rhr->handleMessage(&msg.buf, msg.payload);
 
     return false;
 }

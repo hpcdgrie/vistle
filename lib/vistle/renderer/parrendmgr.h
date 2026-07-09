@@ -30,7 +30,7 @@ public:
     void connectionAdded(const Port *to);
     void connectionRemoved(const Port *to);
 
-    bool handleMessage(const message::Message *message, const MessagePayload &payload);
+    bool handleMessage(const vistle::MessageWithPayload &msg);
 
     bool handleParam(const Parameter *p);
     bool prepareFrame(size_t numTimesteps);

@@ -49,15 +49,12 @@ public:
     bool dispatch(bool &received);
     const StateTracker &state() const;
 
-    bool sendMessage(int receiver, const message::Message &message, int destRank = -1,
-                     const MessagePayload &payload = MessagePayload()) const;
-    bool sendAll(const message::Message &message, const MessagePayload &payload = MessagePayload()) const;
-    bool sendAllLocal(const message::Message &message, const MessagePayload &payload = MessagePayload()) const;
-    bool sendAllOthers(int excluded, const message::Message &message, const MessagePayload &payload,
-                       bool localOnly = false) const;
-    bool sendUi(const message::Message &message, const MessagePayload &paylod = MessagePayload()) const;
-    bool sendHub(const message::Message &message, const MessagePayload &payload = MessagePayload(),
-                 int destHub = message::Id::Broadcast) const;
+    bool sendMessage(int receiver, const MessageWithPayload &message, int destRank = -1) const;
+    bool sendAll(const MessageWithPayload &message) const;
+    bool sendAllLocal(const MessageWithPayload &message) const;
+    bool sendAllOthers(int excluded, const MessageWithPayload &message, bool localOnly = false) const;
+    bool sendUi(const MessageWithPayload &message) const;
+    bool sendHub(const MessageWithPayload &message, int destHub = message::Id::Broadcast) const;
 
     bool quit();
     bool quitOk() const;
@@ -189,7 +186,7 @@ private:
 
         void block(const message::Message &msg) const;
         void unblock(const message::Message &msg) const;
-        bool send(const message::Message &msg, const MessagePayload &payload = MessagePayload()) const;
+        bool send(const MessageWithPayload &message) const;
         bool update() const;
         void delay(const message::Message &msg, const MessagePayload &payload = MessagePayload());
         bool processDelayed(bool *haveExecute = nullptr);

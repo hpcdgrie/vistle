@@ -178,24 +178,39 @@ void ClusterManager::Module::unblock(const message::Message &msg) const
     }
 }
 
-bool ClusterManager::Module::send(const message::Message &msg, const MessagePayload &payload) const
+bool ClusterManager::Module::send(const MessageWithPayload &message) const
 {
-    message::Buffer buf(msg);
-    if (msg.payloadSize() > 0 && payload) {
-        buf.setPayloadName(payload.name());
-    } else {
+    message::Buffer buf = message.buf;
+    const auto payloadSize = buf.payloadSize();
+    const bool hasInternalPayload = payloadSize > 0 && buf.getPayload();
+    const bool hasExternalPayload = payloadSize > 0 && !hasInternalPayload && static_cast<bool>(message.payload);
+
+    if (hasExternalPayload) {
+        // For payload in shared memory, only send a reference to the payload name.
+        buf.setPayloadName(message.payload.name());
+    } else if (!hasInternalPayload) {
         buf.setPayloadName(std::string());
     }
+
+    if (payloadSize > 0 && !hasInternalPayload && !hasExternalPayload) {
+        // Fallback: if payload exists but is neither embedded nor referenced, embed it now.
+        const char *payloadData = message.getPayload();
+        if (payloadData) {
+            vistle::buffer payloadBuffer(payloadData, payloadData + payloadSize);
+            buf.addPayload(&payloadBuffer);
+        }
+    }
+
     std::lock_guard<std::mutex> lock(messageMutex);
     if (blocked) {
-        if (msg.payloadSize() > 0)
-            blockedMessages.emplace_back(buf, payload);
+        if (hasExternalPayload)
+            blockedMessages.emplace_back(buf, message.payload);
         else
             blockedMessages.emplace_back(buf);
         return true;
     } else if (sendQueue) {
-        if (msg.payloadSize() > 0 && payload)
-            payload->ref();
+        if (hasExternalPayload)
+            message.payload->ref();
         return sendQueue->send(buf);
     }
     return false;
@@ -225,7 +240,7 @@ bool ClusterManager::Module::processDelayed(bool *haveExecute)
                 auto &mpl = delayedMessages.front();
                 auto &msg = mpl.buf;
                 auto type = msg.type();
-                ret = Communicator::the().broadcastAndHandleMessage(mpl.buf, mpl.payload);
+                ret = Communicator::the().broadcastAndHandleMessage(MessageWithPayload(mpl.buf, mpl.payload));
                 delayedMessages.pop_front();
                 if (type == message::EXECUTE) {
                     if (haveExecute)
@@ -491,34 +506,33 @@ bool ClusterManager::dispatch(bool &received)
     return !done;
 }
 
-bool ClusterManager::sendAll(const message::Message &message, const MessagePayload &payload) const
+bool ClusterManager::sendAll(const MessageWithPayload &message) const
 {
     // no module has id Invalid
-    return sendAllOthers(message::Id::Invalid, message, payload);
+    return sendAllOthers(message::Id::Invalid, message);
 }
 
-bool ClusterManager::sendAllLocal(const message::Message &message, const MessagePayload &payload) const
+bool ClusterManager::sendAllLocal(const MessageWithPayload &message) const
 {
     // no module has id Invalid
-    return sendAllOthers(message::Id::Invalid, message, payload, true);
+    return sendAllOthers(message::Id::Invalid, message, true);
 }
 
-bool ClusterManager::sendAllOthers(int excluded, const message::Message &message, const MessagePayload &payload,
-                                   bool localOnly) const
+bool ClusterManager::sendAllOthers(int excluded, const MessageWithPayload &message, bool localOnly) const
 {
-    message::Buffer buf(message);
     if (!localOnly) {
+        message::Buffer buf = message.buf;
         buf.setDestId(Id::ForBroadcast);
         if (Communicator::the().isMaster()) {
             if (getRank() == 0)
-                sendHub(buf, payload);
+                sendHub(MessageWithPayload(buf, message.payload));
         } else {
-            int senderHub = message.senderId();
+            int senderHub = message.buf.senderId();
             if (senderHub >= Id::ModuleBase)
                 senderHub = idToHub(senderHub);
             if (senderHub == hubId()) {
                 if (getRank() == 0)
-                    sendHub(buf, payload);
+                    sendHub(MessageWithPayload(buf, message.payload));
             }
         }
         return true;
@@ -537,39 +551,39 @@ bool ClusterManager::sendAllOthers(int excluded, const message::Message &message
         const int hub = idToHub(modId);
 
         if (hub == hubId()) {
-            mod.send(message, payload);
+            mod.send(message);
         }
     }
 
     return true;
 }
 
-bool ClusterManager::sendUi(const message::Message &message, const MessagePayload &payload) const
+bool ClusterManager::sendUi(const MessageWithPayload &message) const
 {
-    return sendHub(message, payload);
+    return sendHub(message);
 }
 
-bool ClusterManager::sendHub(const message::Message &message, const MessagePayload &payload, int destHub) const
+bool ClusterManager::sendHub(const MessageWithPayload &message, int destHub) const
 {
-    if (getRank() != 0 && !message::Router::the().toRank0(message)) {
+    if (getRank() != 0 && !message::Router::the().toRank0(message.buf)) {
         return true;
     }
 
-    message::Buffer buf(message);
+    message::Buffer buf = message.buf;
     if (Id::isHub(destHub))
         buf.setDestId(destHub);
-    buf.setPayloadName(std::string());
-    return Communicator::the().sendHub(buf, payload);
+
+    return Communicator::the().sendHub(MessageWithPayload(buf, message.payload));
 }
 
-bool ClusterManager::sendMessage(const int moduleId, const message::Message &message, int destRank,
-                                 const MessagePayload &payload) const
+bool ClusterManager::sendMessage(const int moduleId, const MessageWithPayload &message, int destRank) const
 {
     const int hub = idToHub(moduleId);
 
-    message::Buffer buf(message);
-    if (payload)
-        buf.setPayloadName(payload.name());
+    auto newMessage = message;
+    message::Buffer &buf = newMessage.buf;
+    if (message.payload)
+        buf.setPayloadName(message.payload.name());
     if (Id::isModule(moduleId) && (hub == hubId() || hub == Id::LocalHub || hub == Id::LocalManager)) {
         //CERR << "local send to " << moduleId << ": " << buf << std::endl;
         if (destRank == -1 || destRank == getRank()) {
@@ -591,15 +605,15 @@ bool ClusterManager::sendMessage(const int moduleId, const message::Message &mes
                     mod.block(addObj);
                 }
             }
-            mod.send(buf, payload);
+            mod.send(newMessage);
         } else {
-            Communicator::the().sendMessage(moduleId, message, destRank, payload);
+            Communicator::the().sendMessage(moduleId, MessageWithPayload(buf, message.payload), destRank);
         }
     } else {
-        CERR << "remote send to " << moduleId << ": " << message << std::endl;
+        CERR << "remote send to " << moduleId << ": " << buf << std::endl;
         buf.setDestId(moduleId);
         buf.setDestRank(destRank);
-        sendHub(buf, payload);
+        sendHub(newMessage);
     }
 
     return true;
@@ -610,12 +624,14 @@ bool ClusterManager::handle(const message::Buffer &message, const MessagePayload
     using namespace vistle::message;
 
     if (message.destId() == Id::ForBroadcast) {
-        return sendHub(message, payload);
+        return sendHub(MessageWithPayload(message, payload));
     }
 
     if (message.type() == m_traceMessages || m_traceMessages == ANY) {
         CERR << "handle: " << message << std::endl;
     }
+
+    auto payloadData = payload ? payload->data() : message.getPayload();
 
     switch (message.type()) {
     case CONNECT:
@@ -629,8 +645,8 @@ bool ClusterManager::handle(const message::Buffer &message, const MessagePayload
         break;
     }
     default:
-        if (payload)
-            m_stateTracker.handle(message, payload->data(), payload->size());
+        if (payloadData)
+            m_stateTracker.handle(message, payloadData, message.payloadSize());
         else
             m_stateTracker.handle(message, nullptr);
         break;
@@ -649,11 +665,11 @@ bool ClusterManager::handle(const message::Buffer &message, const MessagePayload
       if (message.senderId() != hubId() && senderHub == hubId()) {
          CERR << "BC: " << message << std::endl;
          if (getRank() == 0)
-            sendHub(message, payload);
+            sendHub(VistleMessage(message, payload));
       }
 #endif
         if (message.typeFlags() & BroadcastModule) {
-            sendAllLocal(message, payload);
+            sendAllLocal(MessageWithPayload(message, payload));
         }
     }
     if (message::Id::isModule(message.destId())) {
@@ -661,10 +677,10 @@ bool ClusterManager::handle(const message::Buffer &message, const MessagePayload
             //CERR << "module: " << message << std::endl;
             if (message.type() != message::EXECUTE && message.type() != message::CANCELEXECUTE &&
                 message.type() != message::SETPARAMETER) {
-                return sendMessage(message.destId(), message, -1, payload);
+                return sendMessage(message.destId(), MessageWithPayload(message, payload), -1);
             }
         } else if (!message.wasBroadcast()) {
-            return sendHub(message, payload);
+            return sendHub(MessageWithPayload(message, payload));
         }
     }
     if (message::Id::isHub(message.destId()) || message.destId() == message::Id::Config ||
@@ -672,7 +688,7 @@ bool ClusterManager::handle(const message::Buffer &message, const MessagePayload
         if (destHub != hubId() || message.type() == message::EXECUTE || message.type() == message::CANCELEXECUTE ||
             message.type() == message::COVER) {
             if (!message.wasBroadcast()) {
-                return sendHub(message, payload);
+                return sendHub(MessageWithPayload(message, payload));
             }
         }
     }
@@ -693,7 +709,7 @@ bool ClusterManager::handle(const message::Buffer &message, const MessagePayload
             payload.rankAddresses = Communicator::the().m_rankAddresses;
             payload.rankDataPorts = Communicator::the().m_rankDataPorts;
             MessagePayload pl(message::addPayload(ident, payload));
-            sendHub(ident, pl);
+            sendHub(MessageWithPayload(ident, pl));
         }
         break;
     }
@@ -718,7 +734,9 @@ bool ClusterManager::handle(const message::Buffer &message, const MessagePayload
         AvailableModule::Key key(comp.hub(), comp.name());
         auto av = comp.transform();
         av.setHub(hubId());
-        av.send(std::bind(&Communicator::sendHub, &Communicator::the(), std::placeholders::_1, std::placeholders::_2));
+        av.send(sendShmMessageFunction([](const message::Message &msg, const MessagePayload &pl) {
+            return Communicator::the().sendHub(MessageWithPayload(msg, pl));
+        }));
         m_localModules[key] = std::move(av);
         break;
     }
@@ -903,9 +921,9 @@ bool ClusterManager::handlePriv(const message::Trace &trace)
     CERR << "handle: " << trace << std::endl;
 
     if (Id::isModule(trace.module())) {
-        sendMessage(trace.module(), trace);
+        sendMessage(trace.module(), MessageWithPayload(trace));
     } else if (trace.module() == Id::Broadcast) {
-        sendAllLocal(trace);
+        sendAllLocal(MessageWithPayload(trace));
     }
 
     if (trace.module() == hubId() || !(Id::isModule(trace.module() || Id::isHub(trace.module())))) {
@@ -922,13 +940,13 @@ bool ClusterManager::handlePriv(const message::Trace &trace)
 
 bool ClusterManager::handlePriv(const message::SetName &setname)
 {
-    return sendAllLocal(setname);
+    return sendAllLocal(MessageWithPayload(setname));
 }
 
 bool ClusterManager::handlePriv(const message::Quit &quit)
 {
     if (quit.id() == Id::Broadcast || quit.id() == hubId()) {
-        sendAllLocal(quit);
+        sendAllLocal(MessageWithPayload(quit));
         this->quit();
     }
 
@@ -946,7 +964,7 @@ bool ClusterManager::handlePriv(const message::Spawn &spawn)
 
     if (spawn.destId() == Id::Broadcast || spawn.destId() == Id::NextHop) {
         m_stateTracker.handle(spawn, nullptr);
-        sendAllLocal(spawn);
+        sendAllLocal(MessageWithPayload(spawn));
         return true;
     }
 
@@ -1009,7 +1027,7 @@ bool ClusterManager::handlePriv(const message::Spawn &spawn)
         m.setSenderId(newId);
         m_stateTracker.handle(m, nullptr);
         if (getRank() == 0)
-            return sendHub(m);
+            return sendHub(MessageWithPayload(m));
         return true;
     };
 
@@ -1091,12 +1109,12 @@ bool ClusterManager::handlePriv(const message::Spawn &spawn)
     } else {
         prep.setDestId(Id::LocalHub);
         if (getRank() == 0)
-            sendHub(prep);
+            sendHub(MessageWithPayload(prep));
     }
     prep.setDestId(Id::MasterHub);
     prep.setNotify(true);
     if (getRank() == 0)
-        sendHub(prep);
+        sendHub(MessageWithPayload(prep));
 
     // inform newly started module about current parameter values of other modules
     auto state = m_stateTracker.getLockedState();
@@ -1108,7 +1126,7 @@ bool ClusterManager::handlePriv(const message::Spawn &spawn)
             std::copy(m.payload->begin(), m.payload->end(), pl->begin());
             buf.setPayloadName(pl.name());
         }
-        sendMessage(newId, buf, -1, pl);
+        sendMessage(newId, MessageWithPayload(buf, pl), -1);
     }
 
     return true;
@@ -1123,9 +1141,9 @@ bool ClusterManager::handlePriv(const message::Connect &connect)
         int modFrom = connect.getModuleA();
         int modTo = connect.getModuleB();
         if (isLocal(modFrom))
-            sendMessage(modFrom, connect);
+            sendMessage(modFrom, MessageWithPayload(connect));
         if (isLocal(modTo))
-            sendMessage(modTo, connect);
+            sendMessage(modTo, MessageWithPayload(connect));
         if (isLocal(modFrom)) {
             const char *portFrom = connect.getPortAName();
             const char *portTo = connect.getPortBName();
@@ -1174,7 +1192,7 @@ bool ClusterManager::handlePriv(const message::Connect &connect)
             }
         }
     } else {
-        sendHub(connect);
+        sendHub(MessageWithPayload(connect));
     }
     return true;
 }
@@ -1186,11 +1204,11 @@ bool ClusterManager::handlePriv(const message::Disconnect &disconnect)
         int modFrom = disconnect.getModuleA();
         int modTo = disconnect.getModuleB();
         if (isLocal(modFrom))
-            sendMessage(modFrom, disconnect);
+            sendMessage(modFrom, MessageWithPayload(disconnect));
         if (isLocal(modTo))
-            sendMessage(modTo, disconnect);
+            sendMessage(modTo, MessageWithPayload(disconnect));
     } else if (isLocal(disconnect.senderId())) {
-        sendHub(disconnect);
+        sendHub(MessageWithPayload(disconnect));
     }
 
     return true;
@@ -1204,7 +1222,7 @@ bool ClusterManager::handlePriv(const message::ModuleExit &moduleExit)
     //CERR << " Module [" << mod << "] quit" << std::endl;
 
     if (moduleExit.isForwarded()) {
-        sendAllOthers(mod, moduleExit, MessagePayload(), true);
+        sendAllOthers(mod, MessageWithPayload(moduleExit), true);
 
         RunningMap::iterator it = m_runningMap.find(mod);
         if (it != m_runningMap.end()) {
@@ -1242,8 +1260,8 @@ bool ClusterManager::handlePriv(const message::ModuleExit &moduleExit)
     if (m_rank == 0) {
         message::ModuleExit exit = moduleExit;
         exit.setForwarded();
-        sendHub(exit);
-        if (!Communicator::the().broadcastAndHandleMessage(exit))
+        sendHub(MessageWithPayload(exit));
+        if (!Communicator::the().broadcastAndHandleMessage(MessageWithPayload(exit)))
             return false;
     }
 
@@ -1265,7 +1283,7 @@ bool ClusterManager::handlePriv(const message::Execute &exec)
     switch (exec.what()) {
     case message::Execute::Upstream: {
         CERR << "sending upstream exec to " << exec.getModule() << std::endl;
-        mod.send(exec);
+        mod.send(MessageWithPayload(exec));
         break;
     }
     case message::Execute::Prepare: {
@@ -1275,7 +1293,7 @@ bool ClusterManager::handlePriv(const message::Execute &exec)
         assert(mod.reduced);
         mod.prepared = true;
         mod.reduced = false;
-        mod.send(exec);
+        mod.send(MessageWithPayload(exec));
         checkExecuteObject(exec.getModule());
         break;
     }
@@ -1286,12 +1304,12 @@ bool ClusterManager::handlePriv(const message::Execute &exec)
         assert(!mod.reduced);
         mod.prepared = false;
         mod.reduced = true;
-        mod.send(exec);
+        mod.send(MessageWithPayload(exec));
         break;
     }
     case message::Execute::ComputeExecute: {
         if (exec.wasBroadcast()) {
-            mod.send(exec);
+            mod.send(MessageWithPayload(exec));
             mod.prepared = false;
             mod.reduced = true;
         } else if (Communicator::the().getRank() == 0) {
@@ -1303,7 +1321,7 @@ bool ClusterManager::handlePriv(const message::Execute &exec)
                 assert(!mod.prepared);
                 mod.prepared = false;
                 mod.reduced = true;
-                Communicator::the().broadcastAndHandleMessage(exec);
+                Communicator::the().broadcastAndHandleMessage(MessageWithPayload(exec));
             }
         }
         break;
@@ -1321,7 +1339,7 @@ bool ClusterManager::handlePriv(const message::Execute &exec)
             if (exec.wasBroadcast()) {
                 CERR << "executing after broadcast: " << exec << std::endl;
             }
-            mod.send(exec);
+            mod.send(MessageWithPayload(exec));
         } else {
             if (m_rank == 0) {
                 bool doExec = pol == message::SchedulingPolicy::Gang;
@@ -1342,7 +1360,7 @@ bool ClusterManager::handlePriv(const message::Execute &exec)
                 }
                 if (doExec) {
                     CERR << "having " << numObjects << ", executing " << exec.getModule() << std::endl;
-                    Communicator::the().broadcastAndHandleMessage(exec);
+                    Communicator::the().broadcastAndHandleMessage(MessageWithPayload(exec));
                 }
             }
         }
@@ -1364,15 +1382,15 @@ bool ClusterManager::handlePriv(const message::CancelExecute &cancel)
 
     auto &mod = i->second;
     if (cancel.wasBroadcast()) {
-        mod.send(cancel);
+        mod.send(MessageWithPayload(cancel));
         return true;
     }
     if (m_rank > 0) {
-        return Communicator::the().forwardToMaster(cancel);
+        return Communicator::the().forwardToMaster(MessageWithPayload(cancel));
     }
 
     CERR << "non-broadcast CancelExecute: " << cancel << std::endl;
-    return Communicator::the().broadcastAndHandleMessage(cancel);
+    return Communicator::the().broadcastAndHandleMessage(MessageWithPayload(cancel));
 }
 
 bool ClusterManager::addObjectSource(const message::AddObject &addObj)
@@ -1433,7 +1451,7 @@ bool ClusterManager::addObjectSource(const message::AddObject &addObj)
                 a.setDestRank(0);
                 Communicator::the().dataManager().prepareTransfer(a);
                 // TODO: serialize object into message payload - it's small and saves a round trip
-                sendHub(a, MessagePayload(), hub);
+                sendHub(MessageWithPayload(a), hub);
             }
         }
     }
@@ -1498,7 +1516,7 @@ bool ClusterManager::addObjectDestination(const message::AddObject &addObj, Obje
         bool broadcast = false;
         if (destMod.objectPolicy == message::ObjectReceivePolicy::Local) {
             //CERR << "LOCAL object add at " << destId << ": " << addObj2.objectName() << std::endl;
-            if (!sendMessage(destId, addObj2))
+            if (!sendMessage(destId, MessageWithPayload(addObj2)))
                 return false;
             portManager().addObject(destPort);
 
@@ -1507,7 +1525,7 @@ bool ClusterManager::addObjectDestination(const message::AddObject &addObj, Obje
         } else {
             //CERR << "BROADCAST object add at " << destId << ": " << addObj2.objectName() << std::endl;
             broadcast = true;
-            if (!Communicator::the().broadcastAndHandleMessage(addObj2))
+            if (!Communicator::the().broadcastAndHandleMessage(MessageWithPayload(addObj2)))
                 return false;
         }
 
@@ -1527,9 +1545,9 @@ bool ClusterManager::addObjectDestination(const message::AddObject &addObj, Obje
                         addObj2.setUnblocking();
 
                         if (broadcast) {
-                            Communicator::the().broadcastAndHandleMessage(addObj2);
+                            Communicator::the().broadcastAndHandleMessage(MessageWithPayload(addObj2));
                         } else {
-                            sendMessage(addObj2.destId(), addObj2);
+                            sendMessage(addObj2.destId(), MessageWithPayload(addObj2));
                         }
                     });
             }
@@ -1546,7 +1564,7 @@ bool ClusterManager::handlePriv(const message::AddObject &addObj)
     if (addObj.wasBroadcast()) {
         assert(!resendAfterConnect);
         assert(isLocal(addObj.destId()));
-        if (!sendMessage(addObj.destId(), addObj))
+        if (!sendMessage(addObj.destId(), MessageWithPayload(addObj)))
             return false;
 
         if (addObj.isUnblocking()) {
@@ -1599,7 +1617,7 @@ bool ClusterManager::handlePriv(const message::AddObject &addObj)
             if (obj)
                 Communicator::the().dataManager().notifyTransferComplete(addObj);
         } else {
-            return sendMessage(hubId(), addObj, destRank);
+            return sendMessage(hubId(), MessageWithPayload(addObj), destRank);
         }
     }
 
@@ -1647,17 +1665,17 @@ bool ClusterManager::checkExecuteObject(int destId)
     c.setDestId(destId);
     //c.setUuid(addObj.uuid());
     if (destMod.schedulingPolicy == message::SchedulingPolicy::Single) {
-        sendMessage(destId, c);
+        sendMessage(destId, MessageWithPayload(c));
     } else if (destMod.schedulingPolicy == message::SchedulingPolicy::Gang) {
         c.setAllRanks(true);
         CERR << "checkExecuteObject " << destId << ": exec b/c gang scheduling: " << c << std::endl;
-        if (!Communicator::the().broadcastAndHandleMessage(c))
+        if (!Communicator::the().broadcastAndHandleMessage(MessageWithPayload(c)))
             return false;
     } else if (destMod.schedulingPolicy == message::SchedulingPolicy::LazyGang) {
         if (getRank() == 0) {
             handle(c);
         } else {
-            if (!Communicator::the().forwardToMaster(c))
+            if (!Communicator::the().forwardToMaster(MessageWithPayload(c)))
                 return false;
         }
     }
@@ -1732,7 +1750,7 @@ bool ClusterManager::handlePriv(const message::ExecutionProgress &prog)
     handleOnMaster = true;
     if (localSender && handleOnMaster && m_rank != 0) {
         //CERR << "exec progr: forward to master" << std::endl;
-        return Communicator::the().forwardToMaster(prog);
+        return Communicator::the().forwardToMaster(MessageWithPayload(prog));
     }
 
     bool readyForPrepare = false, readyForReduce = false;
@@ -1792,7 +1810,7 @@ bool ClusterManager::handlePriv(const message::ExecutionProgress &prog)
             message::Buffer buf(prog);
             buf.setForBroadcast(false);
             buf.setDestRank(0);
-            sendMessage(hub, buf);
+            sendMessage(hub, MessageWithPayload(buf));
         }
     }
 
@@ -1843,7 +1861,7 @@ bool ClusterManager::handlePriv(const message::ExecutionProgress &prog)
                             if (broadcast) {
                                 //CERR << "Exec prepare 3" << std::endl;
                                 if (m_rank == 0)
-                                    if (!Communicator::the().broadcastAndHandleMessage(exec))
+                                    if (!Communicator::the().broadcastAndHandleMessage(MessageWithPayload(exec)))
                                         return false;
                             } else {
                                 //CERR << "Exec prepare 4" << std::endl;
@@ -1881,7 +1899,7 @@ bool ClusterManager::handlePriv(const message::ExecutionProgress &prog)
                                     }
                                     for (int i = 0; i < maxNumObject; ++i) {
                                         message::Execute exec(message::Execute::ComputeObject, destId);
-                                        if (!Communicator::the().broadcastAndHandleMessage(exec))
+                                        if (!Communicator::the().broadcastAndHandleMessage(MessageWithPayload(exec)))
                                             return false;
                                     }
                                     assert(std::accumulate(destMod.objectCount.begin(), destMod.objectCount.end(), 0) ==
@@ -1897,7 +1915,7 @@ bool ClusterManager::handlePriv(const message::ExecutionProgress &prog)
                             exec.setDestId(destId);
                             if (broadcast) {
                                 if (m_rank == 0)
-                                    if (!Communicator::the().broadcastAndHandleMessage(exec))
+                                    if (!Communicator::the().broadcastAndHandleMessage(MessageWithPayload(exec)))
                                         return false;
                             } else {
                                 handlePriv(exec);
@@ -1921,7 +1939,7 @@ bool ClusterManager::handlePriv(const message::ExecutionProgress &prog)
         if (m_rank == 0) {
             auto done = message::ExecutionDone();
             done.setSenderId(prog.senderId());
-            sendHub(done, MessagePayload(), message::Id::MasterHub);
+            sendHub(MessageWithPayload(done), message::Id::MasterHub);
         }
     }
 
@@ -1936,11 +1954,11 @@ bool ClusterManager::handlePriv(const message::Busy &busy)
         if (mod.busyCount == 0) {
             message::Buffer buf(busy);
             buf.setDestId(Id::UI);
-            sendHub(buf, MessagePayload(), Id::MasterHub);
+            sendHub(MessageWithPayload(buf), Id::MasterHub);
         }
         ++mod.busyCount;
     } else {
-        Communicator::the().forwardToMaster(busy);
+        Communicator::the().forwardToMaster(MessageWithPayload(busy));
     }
     return true;
 }
@@ -1954,10 +1972,10 @@ bool ClusterManager::handlePriv(const message::Idle &idle)
         if (mod.busyCount == 0) {
             message::Buffer buf(idle);
             buf.setDestId(Id::UI);
-            sendHub(buf, MessagePayload(), Id::MasterHub);
+            sendHub(MessageWithPayload(buf), Id::MasterHub);
         }
     } else {
-        Communicator::the().forwardToMaster(idle);
+        Communicator::the().forwardToMaster(MessageWithPayload(idle));
     }
     return true;
 }
@@ -1989,10 +2007,10 @@ bool ClusterManager::handlePriv(const message::SetParameter &setParam)
         // message to owning module
         if (setParam.wasBroadcast()) {
             if (mod) {
-                mod->send(setParam);
+                mod->send(MessageWithPayload(setParam));
             }
         } else {
-            return sendHub(setParam, MessagePayload(), dest);
+            return sendHub(MessageWithPayload(setParam), dest);
         }
     } else if (message::Id::isModule(sender) &&
                (sender == setParam.getModule() || setParam.getModule() == message::Id::Config)) {
@@ -2002,10 +2020,10 @@ bool ClusterManager::handlePriv(const message::SetParameter &setParam)
             setParam.apply(param);
         }
         if (dest == Id::ForBroadcast || dest == Id::Config) {
-            sendHub(setParam, MessagePayload(), dest);
+            sendHub(MessageWithPayload(setParam), dest);
             return true;
         } else if (!Communicator::the().isMaster()) {
-            sendAllOthers(sender, setParam, MessagePayload(), true);
+            sendAllOthers(sender, MessageWithPayload(setParam), true);
         }
     }
 
@@ -2044,9 +2062,9 @@ bool ClusterManager::handlePriv(const message::SetParameterChoices &setChoices, 
             setChoices.apply(param, pl);
         }
         if (dest == Id::ForBroadcast) {
-            sendHub(setChoices, payload, Id::MasterHub);
+            sendHub(MessageWithPayload(setChoices, payload), Id::MasterHub);
         } else if (!Communicator::the().isMaster()) {
-            sendAllOthers(sender, setChoices, payload, true);
+            sendAllOthers(sender, MessageWithPayload(setChoices, payload), true);
         }
     }
 
@@ -2059,7 +2077,7 @@ bool ClusterManager::handlePriv(const message::Barrier &barrier)
     //sendHub(barrier);
     CERR << "Barrier [" << barrier.uuid() << ": " << barrier.info() << "]" << std::endl;
     m_barrierUuid = barrier.uuid();
-    return sendAllLocal(barrier);
+    return sendAllLocal(MessageWithPayload(barrier));
 }
 
 bool ClusterManager::handlePriv(const message::BarrierReached &barrReached)
@@ -2084,7 +2102,7 @@ bool ClusterManager::handlePriv(const message::BarrierReached &barrReached)
             message::BarrierReached m(barrReached.uuid());
             m.setSenderId(barrReached.senderId());
             m.setDestId(Id::MasterHub);
-            sendMessage(Id::MasterHub, m);
+            sendMessage(Id::MasterHub, MessageWithPayload(m));
         }
     } else if (barrReached.senderId() == Id::MasterHub) {
         m_reachedSet.clear();
@@ -2101,9 +2119,9 @@ bool ClusterManager::handlePriv(const message::SendText &text, const MessagePayl
     if (Communicator::the().isMaster()) {
         message::Buffer buf(text);
         buf.setDestId(Id::MasterHub);
-        sendHub(buf, payload);
+        sendHub(MessageWithPayload(buf, payload));
     } else {
-        sendHub(text, payload);
+        sendHub(MessageWithPayload(text, payload));
     }
     return true;
 }
@@ -2113,9 +2131,9 @@ bool ClusterManager::handlePriv(const message::ItemInfo &info, const MessagePayl
     if (Communicator::the().isMaster()) {
         message::Buffer buf(info);
         buf.setDestId(Id::MasterHub);
-        sendHub(buf, payload);
+        sendHub(MessageWithPayload(buf, payload));
     } else {
-        sendHub(info, payload);
+        sendHub(MessageWithPayload(info, payload));
     }
     return true;
 }
@@ -2146,7 +2164,7 @@ bool ClusterManager::handlePriv(const message::RequestTunnel &tunnel)
     std::cerr << std::endl;
 
     if (m_rank > 0) {
-        return Communicator::the().forwardToMaster(tunnel);
+        return Communicator::the().forwardToMaster(MessageWithPayload(tunnel));
     }
 
     message::RequestTunnel tun(tunnel);
@@ -2166,7 +2184,7 @@ bool ClusterManager::handlePriv(const message::RequestTunnel &tunnel)
         }
     }
 
-    return sendHub(tun);
+    return sendHub(MessageWithPayload(tun));
 }
 
 bool ClusterManager::handlePriv(const message::DataTransferState &state)
@@ -2199,7 +2217,7 @@ bool ClusterManager::handlePriv(const message::DataTransferState &state)
 bool ClusterManager::quit()
 {
     if (!m_quitFlag)
-        sendAllLocal(message::Kill(message::Id::Broadcast));
+        sendAllLocal(MessageWithPayload(message::Kill(message::Id::Broadcast)));
 
     // receive all ModuleExit messages from modules
     // retry for some time, modules that don't answer might have crashed
@@ -2337,9 +2355,11 @@ bool ClusterManager::scanModules(const std::string &prefix, const std::string &b
 #endif
 
     if (getRank() == 0) {
+        const sendShmMessageFunction sendViaHub = [](const message::Message &msg, const MessagePayload &pl) {
+            return Communicator::the().sendHub(MessageWithPayload(msg, pl));
+        };
         for (auto &p: m_localModules) {
-            p.second.send(
-                std::bind(&Communicator::sendHub, &Communicator::the(), std::placeholders::_1, std::placeholders::_2));
+            p.second.send(sendViaHub);
         }
     }
 
