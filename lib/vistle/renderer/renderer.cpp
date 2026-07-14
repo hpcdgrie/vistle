@@ -210,9 +210,8 @@ bool Renderer::dispatch(bool block, bool *messageReceived, unsigned int minPrio)
     int maxNumMessages = 0;
     do {
         // process all messages until one needs cooperative processing
-        message::Buffer buf;
-        message::Message &message = buf;
-        bool haveMessage = getNextMessage(buf, false, minPrio);
+        message::Buffer message;
+        bool haveMessage = getNextMessage(message, false, minPrio);
         int needSync = 0;
         if (haveMessage) {
             if (needsSync(message)) {
@@ -248,8 +247,8 @@ bool Renderer::dispatch(bool block, bool *messageReceived, unsigned int minPrio)
                 }
 
                 MessagePayload pl;
-                if (buf.payloadSize() > 0 && !buf.getPayload()) {
-                    pl = Shm::the().getArrayFromName<char>(buf.payloadName());
+                if (message.payloadSize() > 0 && !message.getPayload()) {
+                    pl = Shm::the().getArrayFromName<char>(message.payloadName());
                     pl.unref();
                 }
                 quit = !handleMessage(MessageWithPayload(message, pl));
@@ -260,7 +259,7 @@ bool Renderer::dispatch(bool block, bool *messageReceived, unsigned int minPrio)
             }
 
             if (anySync && !needSync) {
-                haveMessage = getNextMessage(buf, true, minPrio);
+                haveMessage = getNextMessage(message, true, minPrio);
             }
 
         } while (anySync && !needSync);

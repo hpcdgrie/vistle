@@ -32,7 +32,7 @@ public:
     const std::string &getName() const;
 
     void signal(); // immediately send zero-size message
-    bool send(const Message &msg, unsigned int priority = 0);
+    bool send(const Buffer &msg, unsigned int priority = 0);
     bool progress();
 
     bool receive(Message &msg, unsigned int *priority = nullptr);

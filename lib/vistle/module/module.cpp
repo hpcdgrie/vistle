@@ -1516,6 +1516,7 @@ bool Module::sendMessage(const message::Message &message, const buffer *payload)
                 memcpy(pl->data(), payload->data(), payload->size());
                 pl.ref();
                 buf.setPayloadName(pl.name());
+                buf.setPayloadRawSize(payload->size());
                 buf.setPayloadSize(payload->size());
             }
         }
@@ -1532,6 +1533,9 @@ bool Module::sendMessage(const message::Message &message, const buffer *payload)
 
 bool Module::sendMessage(const message::Message &message, const MessagePayload &payload) const
 {
+    if (!payload) {
+        return sendMessage(message, nullptr);
+    }
     // exclude SendText messages to avoid circular calls
     if (message.type() != message::SENDTEXT && (m_traceMessages == message::ANY || m_traceMessages == message.type())) {
         CERR << "SEND: " << message << std::endl;

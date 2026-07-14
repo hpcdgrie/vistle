@@ -314,12 +314,8 @@ public:
         memset(payload.data(), 0, payload.size());
         memcpy(payload.data(), (char *)&message + sizeof(Message), message.size() - sizeof(Message));
     }
-    const Buffer &operator=(const Buffer &rhs)
-    {
-        *static_cast<Message *>(this) = rhs;
-        memcpy(payload.data(), rhs.payload.data(), payload.size());
-        return *this;
-    }
+
+    Buffer(const Buffer &message) = default;
 
     template<class SomeMessage>
     SomeMessage &as()

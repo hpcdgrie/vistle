@@ -342,7 +342,10 @@ bool Communicator::dispatch(bool *work)
             }
         } else {
             received = true;
-            MessagePayload pl(payload);
+            MessagePayload pl;
+            if (!buf.addPayload(&payload)) {
+                pl = MessagePayload(payload);
+            }
             if (buf.destRank() == 0) {
                 handleMessage(buf, pl);
             } else if (buf.destRank() >= 0) {

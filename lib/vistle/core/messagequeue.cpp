@@ -126,7 +126,7 @@ void MessageQueue::signal()
     m_mq.send(nullptr, 0, 0);
 }
 
-bool MessageQueue::send(const Message &msg, unsigned int priority)
+bool MessageQueue::send(const Buffer &msg, unsigned int priority)
 {
     std::unique_lock<std::mutex> guard(m_mutex);
     if (priority == 0) {

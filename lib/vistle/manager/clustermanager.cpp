@@ -182,23 +182,21 @@ bool ClusterManager::Module::send(const MessageWithPayload &message) const
 {
     message::Buffer buf = message.buf;
     const auto payloadSize = buf.payloadSize();
-    const bool hasInternalPayload = payloadSize > 0 && buf.getPayload();
-    const bool hasExternalPayload = payloadSize > 0 && !hasInternalPayload && static_cast<bool>(message.payload);
+    bool hasInternalPayload = payloadSize > 0 && buf.getPayload();
+    bool hasExternalPayload = payloadSize > 0 && !hasInternalPayload && static_cast<bool>(message.payload);
+
+    assert(payloadSize == 0 || hasInternalPayload || hasExternalPayload);
 
     if (hasExternalPayload) {
-        // For payload in shared memory, only send a reference to the payload name.
-        buf.setPayloadName(message.payload.name());
+        vistle::buffer payloadBuffer(message.payload, message.payload + payloadSize);
+        if (buf.addPayload(&payloadBuffer)) //try to convert to internal payload
+        {
+            hasInternalPayload = true;
+            hasExternalPayload = false;
+        } else
+            buf.setPayloadName(message.payload.name());
     } else if (!hasInternalPayload) {
         buf.setPayloadName(std::string());
-    }
-
-    if (payloadSize > 0 && !hasInternalPayload && !hasExternalPayload) {
-        // Fallback: if payload exists but is neither embedded nor referenced, embed it now.
-        const char *payloadData = message.getPayload();
-        if (payloadData) {
-            vistle::buffer payloadBuffer(payloadData, payloadData + payloadSize);
-            buf.addPayload(&payloadBuffer);
-        }
     }
 
     std::lock_guard<std::mutex> lock(messageMutex);
@@ -1005,7 +1003,7 @@ bool ClusterManager::handlePriv(const message::Spawn &spawn)
             }
 
             MessagePayload pl;
-            if (buf.payloadSize() > 0) {
+            if (buf.payloadSize() > 0 && !buf.getPayload()) {
                 pl = Shm::the().getArrayFromName<char>(buf.payloadName());
             }
             std::lock_guard<std::mutex> guard(m_incomingMutex);
