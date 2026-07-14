@@ -13,8 +13,7 @@
 namespace vistle {
 
 const int ModuleNameLength = 50;
-typedef std::function<bool(const message::Message &msg, const buffer *payload)> sendMessageFunction;
-typedef std::function<bool(const message::Message &msg, const MessagePayload &payload)> sendShmMessageFunction;
+typedef std::function<bool(const MessagePayload &payload)> sendMessageFunction;
 
 class V_COREEXPORT AvailableModuleBase {
 public:
@@ -88,20 +87,12 @@ public:
 
 protected:
     template<typename T>
-    bool send(const sendMessageFunction &func) const
+    bool send(const sendMessageFunction &func, bool shm = true) const
     {
         auto msg = T{*this};
-        auto pl = addPayload(msg, *this);
-        return func(msg, &pl);
+        return func(MessagePayload(T{*this}, addPayload(msg, *this), shm));
     }
 
-    template<typename T>
-    bool send(const sendShmMessageFunction &func) const
-    {
-        auto msg = T{*this};
-        auto pl = MessagePayload{addPayload(msg, *this)};
-        return func(msg, pl);
-    }
     template<typename T>
     void initialize(const T &msg)
     {
@@ -144,8 +135,7 @@ public:
     using AvailableModuleBase::AvailableModuleBase;
     AvailableModule(const message::ModuleAvailable &msg, const buffer &payload);
 
-    bool send(const sendMessageFunction &func) const;
-    bool send(const sendShmMessageFunction &func) const;
+    bool send(const sendMessageFunction &func, bool shm = true) const;
 
 private:
     AvailableModule(ModuleCompound &&other);
@@ -156,8 +146,7 @@ public:
     using AvailableModuleBase::AvailableModuleBase;
     ModuleCompound(const message::CreateModuleCompound &msg, const buffer &payload);
 
-    bool send(const sendMessageFunction &func) const;
-    bool send(const sendShmMessageFunction &func) const;
+    bool send(const sendMessageFunction &func, bool shm = true) const;
     AvailableModule transform(); //this invalidates this object;
 };
 typedef std::map<AvailableModule::Key, AvailableModule> AvailableMap;

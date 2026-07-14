@@ -14,12 +14,12 @@ struct HubPythonStateAccessor: public vistle::PythonStateAccessor {
     void lock() override { state().getMutex().lock(); }
     void unlock() override { state().getMutex().unlock(); }
     vistle::StateTracker &state() override { return vistle::Hub::the().stateTracker(); }
-    bool sendMessage(const vistle::message::Message &m, const vistle::buffer *payload = nullptr) override
+    bool sendMessage(const vistle::MessagePayload &message) override
     {
-        bool ret = vistle::Hub::the().handleMessage(m, nullptr, payload, vistle::message::Identify::SCRIPT);
+        bool ret = vistle::Hub::the().handleMessage(nullptr, message, vistle::message::Identify::SCRIPT);
         assert(ret);
         if (!ret) {
-            std::cerr << "Python: failed to send message " << m << std::endl;
+            std::cerr << "Python: failed to send message " << message.buffer() << std::endl;
         }
         return ret;
     }

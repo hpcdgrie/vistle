@@ -119,14 +119,9 @@ AvailableModule::AvailableModule(const message::ModuleAvailable &msg, const buff
     message::getFromPayload(payload, *this);
 }
 
-bool AvailableModule::send(const sendMessageFunction &func) const
+bool AvailableModule::send(const sendMessageFunction &func, bool shm) const
 {
-    return AvailableModuleBase::send<message::ModuleAvailable>(func);
-}
-
-bool AvailableModule::send(const sendShmMessageFunction &func) const
-{
-    return AvailableModuleBase::send<message::ModuleAvailable>(func);
+    return AvailableModuleBase::send<message::ModuleAvailable>(func, shm);
 }
 
 ModuleCompound::ModuleCompound(const message::CreateModuleCompound &msg, const buffer &payload)
@@ -136,14 +131,9 @@ ModuleCompound::ModuleCompound(const message::CreateModuleCompound &msg, const b
     message::getFromPayload(payload, *this);
 }
 
-bool ModuleCompound::send(const sendMessageFunction &func) const
+bool ModuleCompound::send(const sendMessageFunction &func, bool shm) const
 {
-    return AvailableModuleBase::send<message::CreateModuleCompound>(func);
-}
-
-bool ModuleCompound::send(const sendShmMessageFunction &func) const
-{
-    return AvailableModuleBase::send<message::CreateModuleCompound>(func);
+    return AvailableModuleBase::send<message::CreateModuleCompound>(func, shm);
 }
 
 AvailableModule ModuleCompound::transform()

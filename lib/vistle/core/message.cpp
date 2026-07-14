@@ -126,17 +126,22 @@ codec_error::codec_error(const std::string &what): vistle::exception(what)
 
 DefaultSender DefaultSender::s_instance;
 
-bool Buffer::addPayload(const buffer *p)
+const char *Buffer::addPayload(const buffer *p)
 {
     if (!p)
-        return false;
-    if (p->size() > bufferSize() - size())
-        return false;
+        return nullptr;
+    if (p->size() > bufferSize() - size()) {
+        std::cerr << "Buffer::addPayload: payload too large for " << message::toString(type()) << ": " << p->size()
+                  << " > " << bufferSize() - size() << std::endl;
+        return nullptr;
+    }
+    std::cerr << "Buffer::addPayload: copy payload for " << message::toString(type()) << ": " << p->size() << " < "
+              << bufferSize() - size() << std::endl;
     setPayloadSize(p->size());
     setPayloadRawSize(p->size());
     setPayloadName(shm_name_t("includedPayload"));
     memcpy(payload.data() + size(), p->data(), p->size());
-    return true;
+    return payload.data() + size();
 }
 
 const char *Buffer::getPayload() const

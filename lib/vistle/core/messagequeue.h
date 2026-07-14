@@ -8,7 +8,7 @@
 #define BOOST_INTERPROCESS_MSG_QUEUE_CIRCULAR_INDEX
 #include <boost/interprocess/ipc/message_queue.hpp>
 
-#include "message.h"
+#include "messagepayload.h"
 #include "export.h"
 
 namespace vistle {
@@ -32,11 +32,11 @@ public:
     const std::string &getName() const;
 
     void signal(); // immediately send zero-size message
-    bool send(const Buffer &msg, unsigned int priority = 0);
+    bool send(const MessagePayload &msg, unsigned int priority = 0);
     bool progress();
 
-    bool receive(Message &msg, unsigned int *priority = nullptr);
-    bool tryReceive(Message &msg, unsigned int minPrio = 0, unsigned int *priority = nullptr);
+    bool receive(MessagePayload &msg, unsigned int *priority = nullptr);
+    bool tryReceive(MessagePayload &msg, unsigned int minPrio = 0, unsigned int *priority = nullptr);
     size_t getNumMessages();
 
 private:

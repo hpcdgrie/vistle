@@ -103,18 +103,18 @@ VistleFileInfoGatherer::~VistleFileInfoGatherer()
     wait();
 }
 
-bool VistleFileInfoGatherer::handleMessage(const vistle::message::Message &msg, const vistle::buffer &payload)
+bool VistleFileInfoGatherer::handleMessage(const vistle::MessagePayload &msg)
 {
     using namespace vistle::message;
 
-    if (msg.type() != vistle::message::FILEQUERYRESULT)
+    if (msg.buffer().type() != vistle::message::FILEQUERYRESULT)
         return false;
 
     auto &mm = msg.as<vistle::message::FileQueryResult>();
     switch (mm.command()) {
     case FileQuery::SystemInfo: {
         m_initialized = true;
-        auto info = vistle::unpackSystemInfo(payload);
+        auto info = vistle::unpackSystemInfo(vistle::buffer(msg.begin(), msg.end()));
         m_isWindows = info.iswindows;
         m_hostname = QString::fromStdString(info.hostname);
         m_homePath = QString::fromStdString(info.homepath);
@@ -327,7 +327,7 @@ void VistleFileInfoGatherer::fetchExtendedInformation(const QString &path, const
             auto payload = vistle::packFileList(filelist);
             vistle::message::FileQuery query(m_moduleId, cleanPath.toStdString(), FileQuery::LookUpFiles,
                                              payload.size());
-            sendMessage(query, &payload);
+            sendMessage({query, payload, false});
         }
     }
 }

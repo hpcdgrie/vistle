@@ -150,7 +150,7 @@ struct SendRequest {
     socket_t &sock;
     const message::Buffer msg;
     std::shared_ptr<buffer> payload;
-    std::shared_ptr<MessagePayload> payloadShm;
+    std::shared_ptr<ShmVector<char>> payloadShm;
     std::shared_ptr<socket_t> payloadSocket;
     std::function<void(error_code)> handler;
     SendRequest(socket_t &sock, const message::Message &msg, std::shared_ptr<buffer> payload,
@@ -163,9 +163,9 @@ struct SendRequest {
     : sock(sock), msg(msg), payloadSocket(payloadSocket), handler(handler)
     {}
 
-    SendRequest(socket_t &sock, const message::Message &msg, const MessagePayload &payload,
+    SendRequest(socket_t &sock, const message::Message &msg, const ShmVector<char> &payload,
                 std::function<void(error_code)> handler)
-    : sock(sock), msg(msg), payloadShm(std::make_shared<MessagePayload>(payload)), handler(handler)
+    : sock(sock), msg(msg), payloadShm(std::make_shared<ShmVector<char>>(payload)), handler(handler)
     {}
 
     void operator()()
@@ -622,7 +622,7 @@ void async_send(socket_t &sock, const message::Message &msg, std::shared_ptr<buf
     }
 }
 
-void async_send(socket_t &sock, const message::Message &msg, const MessagePayload &payload,
+void async_send(socket_t &sock, const message::Message &msg, const ShmVector<char> &payload,
                 const std::function<void(error_code ec)> handler)
 {
 #ifndef NDEBUG

@@ -37,7 +37,7 @@ DEFINE_ENUM_WITH_STRING_CONVERSIONS(
 class HubParameters: public ParameterManager {
 public:
     HubParameters(Hub &hub);
-    void sendParameterMessage(const message::Message &message, const buffer *payload = nullptr) const override;
+    void sendParameterMessage(const MessagePayload &message = nullptr) const override;
 
 private:
     Hub &m_hub;
@@ -47,7 +47,7 @@ private:
 class SessionParameters: public ParameterManager {
 public:
     SessionParameters(Hub &hub);
-    void sendParameterMessage(const message::Message &message, const buffer *payload = nullptr) const override;
+    void sendParameterMessage(const MessagePayload &message = nullptr) const override;
 
 private:
     Hub &m_hub;
@@ -56,7 +56,7 @@ private:
 class ConfigParameters: public ParameterManager {
 public:
     ConfigParameters(Hub &hub);
-    void sendParameterMessage(const message::Message &message, const buffer *payload = nullptr) const override;
+    void sendParameterMessage(const MessagePayload &message = nullptr) const override;
 
 private:
     Hub &m_hub;
@@ -79,7 +79,7 @@ public:
     bool init(int argc, char *argv[]);
     bool processScript();
     bool dispatch();
-    bool sendMessage(socket_ptr sock, const message::Message &msg, const buffer *payload = nullptr);
+    bool sendMessage(socket_ptr sock, const MessagePayload &message);
     bool isPrincipal() const;
     unsigned short port() const;
     unsigned short dataPort() const;
@@ -90,17 +90,17 @@ public:
     std::shared_ptr<process::child> launchMpiProcess(int type, const std::vector<std::string> &argv);
     const std::string &name() const;
 
-    bool handleMessage(const message::Message &msg, socket_ptr sock = socket_ptr(), const buffer *payload = nullptr,
+    bool handleMessage(const MessagePayload &recv, Hub::socket_ptr sock = socket_ptr(),
                        message::Identify::Identity senderType = message::Identify::UNKNOWN);
-    bool sendManager(const message::Message &msg, int hub = message::Id::LocalHub, const buffer *payload = nullptr);
-    bool sendMaster(const message::Message &msg, const buffer *payload = nullptr);
-    bool sendSlaves(const message::Message &msg, bool returnToSender = false, const buffer *payload = nullptr);
-    bool sendHub(int id, const message::Message &msg, const buffer *payload = nullptr);
-    bool sendUi(const message::Message &msg, int id = message::Id::Broadcast, const buffer *payload = nullptr);
-    bool sendModule(const message::Message &msg, int id, const buffer *payload = nullptr);
-    bool sendAll(const message::Message &msg, const buffer *payload = nullptr);
-    bool sendAllUi(const message::Message &msg, const buffer *payload = nullptr);
-    bool sendAllButUi(const message::Message &msg, const buffer *payload = nullptr);
+    bool sendManager(const MessagePayload &msg, int hub = message::Id::LocalHub);
+    bool sendMaster(const MessagePayload &msg);
+    bool sendSlaves(const MessagePayload &msg, bool returnToSender = false);
+    bool sendHub(int id, const MessagePayload &msg);
+    bool sendUi(const MessagePayload &msg, int id = message::Id::Broadcast);
+    bool sendModule(const MessagePayload &msg, int id);
+    bool sendAll(const MessagePayload &msg);
+    bool sendAllUi(const MessagePayload &msg);
+    bool sendAllButUi(const MessagePayload &msg);
 
     const StateTracker &stateTracker() const;
     StateTracker &stateTracker();

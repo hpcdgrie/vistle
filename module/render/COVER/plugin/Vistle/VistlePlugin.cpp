@@ -640,8 +640,18 @@ void VistlePlugin::message(int toWhom, int type, int length, const void *data)
 {
     if (type == opencover::PluginMessageTypes::VistleMessageOut) {
         const auto *wrap = static_cast<const MessageWithPayload *>(data);
+        assert(wrap);
         if (m_module) {
-            m_module->sendMessage(wrap->buf, wrap->payload);
+            if (wrap->payload) {
+                m_module->sendMessage(wrap->buf, wrap->payload);
+            } else if (wrap->buf.payloadSize() > 0) {
+                // this copy is unncecessary, but hard to avoid
+                auto dataPtr = wrap->buf.getPayload();
+                buffer buf(dataPtr, dataPtr + wrap->buf.payloadSize());
+                m_module->sendMessage(wrap->buf, &buf);
+            } else {
+                m_module->sendMessage(wrap->buf);
+            }
         }
     }
 }
@@ -676,9 +686,12 @@ bool VistlePlugin::sendVisMessage(const covise::Message *msg)
 
     message::Cover cover(m_module->mirrorId(), msg->sender, msg->send_type, msg->type);
     cover.setDestId(message::Id::MasterHub);
-    MessagePayload pl(msg->data.data(), msg->data.length());
+    buffer bufData(msg->data.data(), msg->data.data() + msg->data.length());
     cover.setPayloadSize(msg->data.length());
-    return m_module->sendMessage(cover, pl);
+    std::cerr << "VistlePlugin::sendVisMessage: sending COVER message to Vistle: " << cover.subType()
+              << ", payload size=" << cover.payloadSize() << std::endl;
+
+    return m_module->sendMessage(cover, &bufData);
 }
 
 std::string VistlePlugin::collaborativeSessionId() const

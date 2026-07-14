@@ -28,8 +28,7 @@ UiManager::~UiManager()
     disconnect();
 }
 
-bool UiManager::handleMessage(std::shared_ptr<boost::asio::ip::tcp::socket> sock, const message::Message &msg,
-                              const buffer &payload)
+bool UiManager::handleMessage(std::shared_ptr<boost::asio::ip::tcp::socket> sock, const MessagePayload &msg)
 {
     using namespace vistle::message;
 
@@ -43,7 +42,7 @@ bool UiManager::handleMessage(std::shared_ptr<boost::asio::ip::tcp::socket> sock
         sender = it->second;
     }
 
-    switch (msg.type()) {
+    switch (msg.buffer().type()) {
     case MODULEEXIT: {
         if (!sender) {
             auto &exit = msg.as<ModuleExit>();
@@ -77,17 +76,17 @@ bool UiManager::handleMessage(std::shared_ptr<boost::asio::ip::tcp::socket> sock
         return true;
     }
 
-    return m_hub.handleMessage(msg, sock, &payload);
+    return m_hub.handleMessage(msg, sock);
 }
 
-void UiManager::sendMessage(const message::Message &msg, int id, const buffer *payload) const
+void UiManager::sendMessage(const MessagePayload &msg, int id) const
 {
     std::vector<std::shared_ptr<UiClient>> toRemove;
 
     std::unique_lock lock(m_mutex);
     for (auto ent: m_clients) {
         if (id == message::Id::Broadcast || ent.second->id() == id) {
-            if (!sendMessage(ent.second, msg, payload)) {
+            if (!sendMessage(ent.second, msg)) {
                 toRemove.push_back(ent.second);
             }
         }
@@ -98,14 +97,15 @@ void UiManager::sendMessage(const message::Message &msg, int id, const buffer *p
     }
 }
 
-bool UiManager::sendMessage(std::shared_ptr<UiClient> c, const message::Message &msg, const buffer *payload) const
+bool UiManager::sendMessage(std::shared_ptr<UiClient> c, const MessagePayload &msg) const
 {
     std::unique_lock lock(m_mutex);
 #if BOOST_VERSION < 107000
     //FIXME is message reliably sent, e.g. also during shutdown, without polling?
     auto &ioService = c->socket()->get_io_service();
 #endif
-    bool ret = message::send(*c->socket(), msg, payload);
+    message::error_code ec;
+    bool ret = message::send(*c->socket(), msg.buffer(), ec, msg.data(), msg.size());
 #if BOOST_VERSION < 107000
     ioService.poll();
 #endif
@@ -150,7 +150,7 @@ void UiManager::addClient(std::shared_ptr<boost::asio::ip::tcp::socket> sock)
         sendMessage(c, message::LockUi(true));
         auto state = m_stateTracker.getLockedState();
         for (auto &m: state.messages) {
-            sendMessage(c, m.message, m.payload.get());
+            sendMessage(c, m);
         }
         if (!m_locked) {
             sendMessage(c, message::LockUi(m_locked));

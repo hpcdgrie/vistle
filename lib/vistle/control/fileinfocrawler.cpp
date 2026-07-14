@@ -245,12 +245,13 @@ bool FileInfoCrawler::sendResponse(const message::FileQuery &query, message::Fil
                                    const buffer &payload)
 {
     message::FileQueryResult response(query, s, payload.size());
+    MessagePayload msg(response, payload.data(), payload.size());
     if (m_hub.id() == query.senderId()) {
         //CERR << "sending to " << query.uiId() << ", path=" << query.path() << ", payload sz=" << payload.size() << std::endl;
-        return m_hub.sendUi(response, query.uiId(), &payload);
+        return m_hub.sendUi(msg, query.uiId());
     }
 
-    return m_hub.sendHub(query.senderId(), response, &payload);
+    return m_hub.sendHub(query.senderId(), msg);
 }
 
 } // namespace vistle
