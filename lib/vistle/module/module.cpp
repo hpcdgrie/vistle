@@ -1560,7 +1560,7 @@ bool Module::sendMessage(const message::Message &message, const MessagePayload &
     return true;
 }
 
-bool Module::handleMessage(const vistle::MessageWithPayload &vistleMsg)
+bool Module::handleMessage(const vistle::MessagePayload &vistleMsg)
 {
     using namespace vistle::message;
 

@@ -14,7 +14,7 @@
 #include <cover/coVRPlugin.h>
 #include <cover/ui/Owner.h>
 
-#include <vistle/core/messagewithpayload.h>
+#include <vistle/core/messagepayload.h>
 #include <vistle/rhr/rfbext.h>
 
 #include <boost/asio.hpp>

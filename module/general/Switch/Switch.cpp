@@ -28,7 +28,7 @@ Switch::Switch(const std::string &name, int moduleID, mpi::communicator comm)
     m_choice =
         addIntParameter("choice", "choose the input that is forwarded to output", 0, Parameter::Presentation::Choice);
 
-
+    std::this_thread::sleep_for(std::chrono::seconds(10));
     setParameterChoices(m_choice, m_inputSpecies);
     configureParameter(m_choice, Parameter::RendererGui, 1);
 }

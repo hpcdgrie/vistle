@@ -14,8 +14,8 @@ public:
     MessagePayload(const message::Message &msg); // MessagePayload without payload
     MessagePayload(const message::Message &msg, const vistle::buffer &payload,
                    bool shm = true); // copy payload to shm or buffer
-    MessagePayload(const message::Message &msg, const char *data,
-                   size_t size); // non-owning payload to be immediatly sent
+    MessagePayload(const message::Message &msg,
+                   std::shared_ptr<vistle::buffer> payload); // use existing buffer as payload
 
     MessagePayload(const MessagePayload &other);
     MessagePayload(MessagePayload &&other);
@@ -43,12 +43,23 @@ public:
 
     message::Buffer &buffer();
     const message::Buffer &buffer() const;
+    vistle::buffer *payload();
+
+    // save a copy if we alredy have a payload as buffer
+    // todo: change the archive functions so that they can work on other arrays
+    template<typename Payload>
+    Payload getPayload() const
+    {
+        if (m_payload)
+            return message::getPayload<Payload>(*m_payload);
+        else
+            return message::getPayload<Payload>({begin(), end()});
+    }
 
 private:
     ShmVector<char> m_shmPayload;
-    vistle::buffer m_payload;
+    std::shared_ptr<vistle::buffer> m_payload;
     const char *m_internalPayload = nullptr;
-    const char *m_borrowedPayload = nullptr;
     message::Buffer m_buffer;
 };
 } // namespace vistle

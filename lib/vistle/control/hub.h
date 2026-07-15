@@ -37,7 +37,7 @@ DEFINE_ENUM_WITH_STRING_CONVERSIONS(
 class HubParameters: public ParameterManager {
 public:
     HubParameters(Hub &hub);
-    void sendParameterMessage(const MessagePayload &message = nullptr) const override;
+    void sendParameterMessage(const MessagePayload &message) const override;
 
 private:
     Hub &m_hub;
@@ -47,7 +47,7 @@ private:
 class SessionParameters: public ParameterManager {
 public:
     SessionParameters(Hub &hub);
-    void sendParameterMessage(const MessagePayload &message = nullptr) const override;
+    void sendParameterMessage(const MessagePayload &message) const override;
 
 private:
     Hub &m_hub;
@@ -56,7 +56,7 @@ private:
 class ConfigParameters: public ParameterManager {
 public:
     ConfigParameters(Hub &hub);
-    void sendParameterMessage(const MessagePayload &message = nullptr) const override;
+    void sendParameterMessage(const MessagePayload &message) const override;
 
 private:
     Hub &m_hub;
@@ -297,7 +297,7 @@ private:
 
     bool handlePriv(const message::Quit &quit, message::Identify::Identity senderType);
     bool handlePriv(const message::RemoveHub &rm);
-    bool handlePriv(const message::Execute &exec, const buffer *payload);
+    bool handlePriv(const message::Execute &exec, const MessagePayload &payload);
     bool handlePriv(const message::ExecutionDone &done);
     bool handlePriv(const message::CancelExecute &cancel);
     bool handlePriv(const message::Barrier &barrier);
@@ -305,19 +305,19 @@ private:
     bool handlePriv(const message::RequestTunnel &tunnel);
     bool handlePriv(const message::Connect &conn);
     bool handlePriv(const message::Disconnect &disc);
-    bool handlePriv(const message::FileQuery &query, const buffer *payload);
-    bool handlePriv(const message::FileQueryResult &result, const buffer *payload);
-    bool handlePriv(const message::Cover &cover, const buffer *payload);
+    bool handlePriv(const message::FileQuery &query, const MessagePayload &payload);
+    bool handlePriv(const message::FileQueryResult &result, const MessagePayload &payload);
+    bool handlePriv(const message::Cover &cover, const MessagePayload &payload);
     bool handlePriv(const message::ModuleExit &exit);
     bool handlePriv(const message::Kill &kill);
     bool handlePriv(const message::Spawn &spawn);
     bool handlePriv(const message::SetName &setname);
     bool handlePriv(const message::LoadWorkflow &load);
     bool handlePriv(const message::SaveWorkflow &save);
-    bool handlePriv(const message::Colormap &cm, const buffer *payload);
+    bool handlePriv(const message::Colormap &cm, const MessagePayload &payload);
     bool handlePriv(const message::RemoveColormap &rmcm);
     bool handlePriv(const message::SetParameter &param);
-    bool handlePriv(const message::SendText &st, const buffer *payload);
+    bool handlePriv(const message::SendText &st, const MessagePayload &payload);
 
     template<typename ConnMsg>
     bool handleConnectOrDisconnect(const ConnMsg &mm);

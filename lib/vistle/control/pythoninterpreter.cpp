@@ -16,7 +16,7 @@ struct HubPythonStateAccessor: public vistle::PythonStateAccessor {
     vistle::StateTracker &state() override { return vistle::Hub::the().stateTracker(); }
     bool sendMessage(const vistle::MessagePayload &message) override
     {
-        bool ret = vistle::Hub::the().handleMessage(nullptr, message, vistle::message::Identify::SCRIPT);
+        bool ret = vistle::Hub::the().handleMessage(message, nullptr, vistle::message::Identify::SCRIPT);
         assert(ret);
         if (!ret) {
             std::cerr << "Python: failed to send message " << message.buffer() << std::endl;

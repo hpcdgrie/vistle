@@ -49,12 +49,12 @@ public:
     bool dispatch(bool &received);
     const StateTracker &state() const;
 
-    bool sendMessage(int receiver, const MessageWithPayload &message, int destRank = -1) const;
-    bool sendAll(const MessageWithPayload &message) const;
-    bool sendAllLocal(const MessageWithPayload &message) const;
-    bool sendAllOthers(int excluded, const MessageWithPayload &message, bool localOnly = false) const;
-    bool sendUi(const MessageWithPayload &message) const;
-    bool sendHub(const MessageWithPayload &message, int destHub = message::Id::Broadcast) const;
+    bool sendMessage(int receiver, const MessagePayload &message, int destRank = -1) const;
+    bool sendAll(const MessagePayload &message) const;
+    bool sendAllLocal(const MessagePayload &message) const;
+    bool sendAllOthers(int excluded, const MessagePayload &message, bool localOnly = false) const;
+    bool sendUi(const MessagePayload &message) const;
+    bool sendHub(const MessagePayload &message, int destHub = message::Id::Broadcast) const;
 
     bool quit();
     bool quitOk() const;
@@ -156,7 +156,7 @@ private:
     const int m_size;
 
     std::mutex m_incomingMutex;
-    std::deque<MessageWithPayload> m_incomingMessages;
+    std::deque<MessagePayload> m_incomingMessages;
 
     struct Module {
         //#ifdef MODULE_THREAD
@@ -174,11 +174,10 @@ private:
         mutable std::mutex messageMutex; // mutex for message handling
         mutable bool blocked = false; // any message is blocking and cannot be sent right away
         mutable std::deque<message::Buffer> blockers; // queue of blocking messages
-        mutable std::deque<MessageWithPayload> blockedMessages; // again, but with payload
-        std::deque<MessageWithPayload>
-            delayedMessages; // these messages have been held up for not disturbing their order
+        mutable std::deque<MessagePayload> blockedMessages; // again, but with payload
+        std::deque<MessagePayload> delayedMessages; // these messages have been held up for not disturbing their order
         // handling of incoming messages
-        std::deque<MessageWithPayload> incomingMessages; // not yet processed, because module takes part in a barrier
+        std::deque<MessagePayload> incomingMessages; // not yet processed, because module takes part in a barrier
         std::vector<int> objectCount; // no. of available object tuples on each rank
 
         Module(): ranksStarted(0), ranksFinished(0), prepared(false), reduced(true), busyCount(0), blocked(false) {}
@@ -186,7 +185,7 @@ private:
 
         void block(const message::Message &msg) const;
         void unblock(const message::Message &msg) const;
-        bool send(const MessageWithPayload &message) const;
+        bool send(const MessagePayload &message) const;
         bool update() const;
         void delay(const message::Message &msg, const MessagePayload &payload = MessagePayload());
         bool processDelayed(bool *haveExecute = nullptr);

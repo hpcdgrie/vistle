@@ -11,20 +11,11 @@ MessagePayload::MessagePayload(const message::Message &msg, const vistle::buffer
         if (shm)
             m_shmPayload = ShmVector<char>(payload.data(), payload.size());
         else
-            m_payload = payload;
-}
-
-MessagePayload::MessagePayload(const message::Message &msg, const char *data, size_t size)
-: m_buffer(msg), m_borrowedPayload(data)
-{
-    m_buffer.setPayloadSize(size);
+            m_payload = std::make_shared<vistle::buffer>(payload);
 }
 
 MessagePayload::MessagePayload(const MessagePayload &other)
-: m_shmPayload(other.m_shmPayload)
-, m_payload(other.m_payload)
-, m_borrowedPayload(other.m_borrowedPayload)
-, m_buffer(other.m_buffer)
+: m_shmPayload(other.m_shmPayload), m_payload(other.m_payload), m_buffer(other.m_buffer)
 {
     m_internalPayload = m_buffer.getPayload();
 }
@@ -32,10 +23,15 @@ MessagePayload::MessagePayload(const MessagePayload &other)
 MessagePayload::MessagePayload(MessagePayload &&other)
 : m_shmPayload(std::move(other.m_shmPayload))
 , m_payload(std::move(other.m_payload))
-, m_borrowedPayload(other.m_borrowedPayload)
 , m_buffer(std::move(other.m_buffer))
 {
     m_internalPayload = m_buffer.getPayload();
+}
+
+MessagePayload::MessagePayload(const message::Message &msg, std::shared_ptr<vistle::buffer> payload)
+: m_buffer(msg), m_payload(payload)
+{
+    m_buffer.setPayloadSize(payload->size());
 }
 
 MessagePayload &MessagePayload::operator=(const MessagePayload &other)
@@ -43,7 +39,6 @@ MessagePayload &MessagePayload::operator=(const MessagePayload &other)
     if (this != &other) {
         m_shmPayload = other.m_shmPayload;
         m_payload = other.m_payload;
-        m_borrowedPayload = other.m_borrowedPayload;
         m_buffer = other.m_buffer;
         m_internalPayload = m_buffer.getPayload();
     }
@@ -55,7 +50,6 @@ MessagePayload &MessagePayload::operator=(MessagePayload &&other)
     if (this != &other) {
         m_shmPayload = std::move(other.m_shmPayload);
         m_payload = std::move(other.m_payload);
-        m_borrowedPayload = other.m_borrowedPayload;
         m_buffer = std::move(other.m_buffer);
         m_internalPayload = m_buffer.getPayload();
     }
@@ -78,11 +72,8 @@ const char *MessagePayload::data() const
     if (m_internalPayload) {
         return m_internalPayload;
     }
-    if (m_payload.size() > 0) {
-        return m_payload.data();
-    }
-    if (m_borrowedPayload) {
-        return m_borrowedPayload;
+    if (m_payload->size() > 0) {
+        return m_payload->data();
     }
     assert(m_shmPayload);
     return m_shmPayload->data();
@@ -113,5 +104,9 @@ const message::Buffer &MessagePayload::buffer() const
     return m_buffer;
 }
 
+vistle::buffer *MessagePayload::payload()
+{
+    return m_payload.get();
+}
 
 } // namespace vistle

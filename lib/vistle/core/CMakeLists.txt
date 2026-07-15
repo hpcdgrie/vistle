@@ -104,7 +104,6 @@ set(core_HEADERS
     messagerouter.h
     messages.h
     messagesender.h
-    messagewithpayload.h
     ngons_impl.h
     ngons.h
     normals_impl.h

@@ -16,7 +16,7 @@
 #include <vistle/util/exception.h>
 #include <vistle/util/threadname.h>
 #include <vistle/core/statetracker.h>
-#include <vistle/core/messagewithpayload.h>
+#include <vistle/core/messagepayload.h>
 #include <vistle/control/vistleurl.h>
 
 #include <vistle/manager/manager.h>

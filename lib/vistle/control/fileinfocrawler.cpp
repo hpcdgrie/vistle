@@ -245,7 +245,7 @@ bool FileInfoCrawler::sendResponse(const message::FileQuery &query, message::Fil
                                    const buffer &payload)
 {
     message::FileQueryResult response(query, s, payload.size());
-    MessagePayload msg(response, payload.data(), payload.size());
+    MessagePayload msg(response, payload, false);
     if (m_hub.id() == query.senderId()) {
         //CERR << "sending to " << query.uiId() << ", path=" << query.path() << ", payload sz=" << payload.size() << std::endl;
         return m_hub.sendUi(msg, query.uiId());

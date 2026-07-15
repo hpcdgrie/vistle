@@ -35,13 +35,13 @@
 #include <vistle/core/port.h>
 #include <vistle/core/grid.h>
 #include <vistle/core/message.h>
+#include <vistle/core/messagepayload.h>
 #include <vistle/core/parametermanager.h>
 #include <vistle/core/messagesender.h>
-#include <vistle/core/messagepayload.h>
 #include <vistle/config/config.h>
 
 #include "objectcache.h"
-#include <vistle/core/messagewithpayload.h>
+#include <vistle/core/messagepayload.h>
 #define RESULTCACHE_SKIP_DEFINITION
 #include "resultcache.h"
 #undef RESULTCACHE_SKIP_DEFINITION
@@ -302,7 +302,7 @@ protected:
     message::MessageQueue *sendMessageQueue;
     message::MessageQueue *receiveMessageQueue;
     std::deque<message::Buffer> messageBacklog;
-    virtual bool handleMessage(const vistle::MessageWithPayload &msg);
+    virtual bool handleMessage(const vistle::MessagePayload &msg);
     virtual bool handleExecute(const message::Execute *exec);
     bool cancelRequested(bool collective = false);
     bool wasCancelRequested() const;

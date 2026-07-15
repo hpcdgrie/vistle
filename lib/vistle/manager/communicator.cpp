@@ -19,7 +19,7 @@
 #include <cassert>
 #include <vistle/core/shm.h>
 #include <vistle/core/messagepayload.h>
-#include <vistle/core/messagewithpayload.h>
+#include <vistle/core/messagepayload.h>
 #include <vistle/util/sleep.h>
 #include <vistle/util/tools.h>
 #include <vistle/util/hostname.h>
@@ -100,7 +100,7 @@ bool Communicator::isMaster() const
 void Communicator::setStatus(const std::string &text, int prio)
 {
     message::UpdateStatus t(text, (message::UpdateStatus::Importance)prio);
-    sendMessage(message::Id::ForBroadcast, MessageWithPayload(t));
+    sendMessage(message::Id::ForBroadcast, MessagePayload(t));
 }
 
 void Communicator::clearStatus()
@@ -191,7 +191,7 @@ bool Communicator::connectData()
     return m_dataManager->connect(m_dataEndpoint);
 }
 
-bool Communicator::sendHub(const MessageWithPayload &message)
+bool Communicator::sendHub(const MessagePayload &message)
 {
     if (getRank() == 0) {
         auto buf = message.buf;
@@ -254,7 +254,7 @@ bool Communicator::dispatch(bool *work)
                 message->setPayloadName(payload.name());
             }
             if (m_rank == 0 && message->isForBroadcast()) {
-                if (!broadcastAndHandleMessage(MessageWithPayload(*message, payload))) {
+                if (!broadcastAndHandleMessage(MessagePayload(*message, payload))) {
                     CERR << "Quit reason: broadcast & handle" << std::endl;
                     done = true;
                 }
@@ -335,9 +335,9 @@ bool Communicator::dispatch(bool *work)
             if (ec) {
                 CERR << "Quit reason: hub comm interrupted: " << ec.message() << std::endl;
                 if (hubId() == Id::MasterHub)
-                    broadcastAndHandleMessage(MessageWithPayload(message::Quit()));
+                    broadcastAndHandleMessage(MessagePayload(message::Quit()));
                 else
-                    broadcastAndHandleMessage(MessageWithPayload(message::Quit(hubId())));
+                    broadcastAndHandleMessage(MessagePayload(message::Quit(hubId())));
                 done = true;
             }
         } else {
@@ -349,9 +349,9 @@ bool Communicator::dispatch(bool *work)
             if (buf.destRank() == 0) {
                 handleMessage(buf, pl);
             } else if (buf.destRank() >= 0) {
-                const MessageWithPayload outgoing(buf, pl);
+                const MessagePayload outgoing(buf, pl);
                 this->startSend(buf.destRank(), outgoing);
-            } else if (!broadcastAndHandleMessage(MessageWithPayload(buf, pl))) {
+            } else if (!broadcastAndHandleMessage(MessagePayload(buf, pl))) {
                 CERR << "Quit reason: broadcast & handle 2: " << buf << buf << std::endl;
                 done = true;
             }
@@ -393,9 +393,9 @@ bool Communicator::dispatch(bool *work)
 
     if (m_rank == 0 && done) {
         if (hubId() == Id::MasterHub)
-            sendHub(MessageWithPayload(message::Quit()));
+            sendHub(MessagePayload(message::Quit()));
         else
-            sendHub(MessageWithPayload(message::Quit(hubId())));
+            sendHub(MessagePayload(message::Quit(hubId())));
     }
 
     return !done;
@@ -406,7 +406,7 @@ void Communicator::terminate()
     m_terminate = true;
 }
 
-bool Communicator::startSend(int destRank, const MessageWithPayload &message)
+bool Communicator::startSend(int destRank, const MessagePayload &message)
 {
     std::lock_guard guard(m_mutex);
     auto p = m_ongoingSends.emplace(new SendRequest(message.buf));
@@ -455,7 +455,7 @@ bool Communicator::SendRequest::testComplete()
     return flag;
 }
 
-bool Communicator::sendMessage(const int moduleId, const MessageWithPayload &message, int destRank)
+bool Communicator::sendMessage(const int moduleId, const MessagePayload &message, int destRank)
 {
     if (m_rank == destRank || destRank == -1) {
         return clusterManager().sendMessage(moduleId, message);
@@ -464,7 +464,7 @@ bool Communicator::sendMessage(const int moduleId, const MessageWithPayload &mes
     return startSend(destRank, message);
 }
 
-bool Communicator::forwardToMaster(const MessageWithPayload &message)
+bool Communicator::forwardToMaster(const MessagePayload &message)
 {
     assert(m_rank != 0);
     if (m_rank != 0) {
@@ -474,7 +474,7 @@ bool Communicator::forwardToMaster(const MessageWithPayload &message)
     return true;
 }
 
-bool Communicator::broadcastAndHandleMessage(const MessageWithPayload &message)
+bool Communicator::broadcastAndHandleMessage(const MessagePayload &message)
 {
     assert(message.buf.destRank() == -1);
     auto payloadData = const_cast<char *>(message.getPayload());
@@ -486,7 +486,7 @@ bool Communicator::broadcastAndHandleMessage(const MessageWithPayload &message)
     if (m_rank > 0) {
         buf.setForBroadcast(true);
         buf.setWasBroadcast(false);
-        return forwardToMaster(MessageWithPayload(buf, message.payload));
+        return forwardToMaster(MessagePayload(buf, message.payload));
     }
 
     buf.setForBroadcast(false);

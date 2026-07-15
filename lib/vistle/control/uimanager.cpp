@@ -72,7 +72,7 @@ bool UiManager::handleMessage(std::shared_ptr<boost::asio::ip::tcp::socket> sock
     }
 
     if (isLocked()) {
-        m_queue.emplace_back(msg);
+        m_queue.emplace_back(msg.buffer());
         return true;
     }
 
