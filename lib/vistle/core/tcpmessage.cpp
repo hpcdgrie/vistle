@@ -253,51 +253,67 @@ void submitSendRequest(std::shared_ptr<SendRequest> req)
 
 } // namespace
 
+
+char *buffer_allocator(void *buf, size_t size)
+{
+    auto b = static_cast<buffer *>(buf);
+    b->resize(size);
+    return b->data();
+}
+
+bool recv_payload(socket_t &sock, message::Buffer &msg, error_code &ec, void *payload,
+                  char *(*allocator)(void *, size_t))
+{
+    if (msg.payloadSize() == 0) {
+        return true;
+    }
+#ifdef DEBUG
+    SizeType pltag;
+    auto tagbuf = asio::buffer(&pltag, sizeof(pltag));
+    size_t tagsz = asio::read(sock, tagbuf, ec);
+    if (ec) {
+        std::cerr << "message::recv: payload tag error " << ec.message() << std::endl;
+        std::cerr << "last message: " << lastMessages[&sock] << std::endl;
+        std::cerr << backtrace() << std::endl;
+        return false;
+    } else if (tagsz != sizeof(pltag)) {
+        std::cerr << "message::recv: short payload tag read: received " << tagsz << " instead of " << sizeof(pltag)
+                  << std::endl;
+        std::cerr << "last message: " << lastMessages[&sock] << std::endl;
+        std::cerr << backtrace() << std::endl;
+        return false;
+    } else if (pltag != PayloadStart) {
+        std::cerr << "message::recv: payload tag mismatch: expected 0x" << std::hex << PayloadStart << ", received 0x"
+                  << std::hex << pltag << "=" << std::dec << pltag << std::endl;
+        std::cerr << "last message: " << lastMessages[&sock] << std::endl;
+        std::cerr << backtrace() << std::endl;
+        return false;
+    }
+#endif
+    buffer pl;
+    if (!payload) {
+        std::cerr << "message::recv: ignoring payload: " << msg << std::endl;
+        payload = &pl;
+        allocator = buffer_allocator;
+    }
+    auto data = allocator(payload, msg.payloadSize());
+    auto buf = asio::buffer(data, msg.payloadSize());
+    size_t sz = asio::read(sock, buf, ec);
+    if (ec) {
+        std::cerr << "message::recv: payload error " << ec.message() << std::endl;
+        return false;
+    } else if (sz != msg.payloadSize()) {
+        std::cerr << "message::recv: short payload read: received " << sz << " instead of " << msg.payloadSize()
+                  << std::endl;
+        return false;
+    }
+    return true;
+}
+
+
 bool recv_payload(socket_t &sock, message::Buffer &msg, error_code &ec, buffer *payload)
 {
-    if (msg.payloadSize() > 0) {
-#ifdef DEBUG
-        SizeType pltag;
-        auto tagbuf = asio::buffer(&pltag, sizeof(pltag));
-        size_t tagsz = asio::read(sock, tagbuf, ec);
-        if (ec) {
-            std::cerr << "message::recv: payload tag error " << ec.message() << std::endl;
-            std::cerr << "last message: " << lastMessages[&sock] << std::endl;
-            std::cerr << backtrace() << std::endl;
-            return false;
-        } else if (tagsz != sizeof(pltag)) {
-            std::cerr << "message::recv: short payload tag read: received " << tagsz << " instead of " << sizeof(pltag)
-                      << std::endl;
-            std::cerr << "last message: " << lastMessages[&sock] << std::endl;
-            std::cerr << backtrace() << std::endl;
-            return false;
-        } else if (pltag != PayloadStart) {
-            std::cerr << "message::recv: payload tag mismatch: expected 0x" << std::hex << PayloadStart
-                      << ", received 0x" << std::hex << pltag << "=" << std::dec << pltag << std::endl;
-            std::cerr << "last message: " << lastMessages[&sock] << std::endl;
-            std::cerr << backtrace() << std::endl;
-            return false;
-        }
-#endif
-        buffer pl;
-        if (!payload) {
-            std::cerr << "message::recv: ignoring payload: " << msg << std::endl;
-            payload = &pl;
-        }
-        payload->resize(msg.payloadSize());
-        auto buf = asio::buffer(payload->data(), payload->size());
-        size_t sz = asio::read(sock, buf, ec);
-        if (ec) {
-            std::cerr << "message::recv: payload error " << ec.message() << std::endl;
-            return false;
-        } else if (sz != msg.payloadSize()) {
-            std::cerr << "message::recv: short payload read: received " << sz << " instead of " << payload->size()
-                      << std::endl;
-            return false;
-        }
-    }
-
-    return true;
+    return recv_payload(sock, msg, ec, payload, buffer_allocator);
 }
 
 namespace {
