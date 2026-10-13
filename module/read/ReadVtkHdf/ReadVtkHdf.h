@@ -5,6 +5,7 @@
 
 #include <hdf5.h>
 
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -36,11 +37,14 @@ private:
         const std::vector<vistle::Index> *cellMap = nullptr;
     };
 
-    bool readUnstructured(Token &token, hid_t file, int timestep, int block);
-    bool readImage(Token &token, hid_t file, int block, int timestep, double realTime);
+    // objects created while reading, to be added to their ports after the HDF5 lock has been released
+    using Outputs = std::vector<std::pair<vistle::Port *, vistle::Object::ptr>>;
+
+    bool readUnstructured(Token &token, Outputs &outputs, hid_t file, int timestep, int block);
+    bool readImage(Token &token, Outputs &outputs, hid_t file, int block, int timestep, double realTime);
     void findSeries(const std::string &filename);
-    bool addFields(Token &token, hid_t file, vistle::Object::const_ptr grid, const FieldRange &range, int step,
-                   int timestep, int block, double realTime);
+    bool addFields(Token &token, Outputs &outputs, hid_t file, vistle::Object::const_ptr grid, const FieldRange &range,
+                   int step, int timestep, int block, double realTime);
 
     vistle::StringParameter *m_filename = nullptr;
     vistle::IntParameter *m_detectSeries = nullptr;
@@ -54,6 +58,7 @@ private:
     bool m_series = false;
     std::vector<std::string> m_files;
     std::vector<double> m_fileTimes;
+    std::vector<unsigned char> m_reportedFileSteps;
     StepInfo m_steps;
     std::vector<long long> m_numPoints, m_numCells, m_numConnectivity;
     long long m_extent[6] = {0, 0, 0, 0, 0, 0};

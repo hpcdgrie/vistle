@@ -26,10 +26,11 @@ const char *const Root = "/VTKHDF";
 const char *const PointData = "PointData";
 const char *const CellData = "CellData";
 
-// the HDF5 library is not necessarily thread-safe
+#ifndef H5_HAVE_THREADSAFE
 std::mutex hdf5Mutex;
+#endif
 
-// directory of the file being read: external links are resolved relative to it (protected by hdf5Mutex)
+// directory of the file being read: external links are resolved relative to it
 std::string externalPrefix;
 
 void setExternalPrefix(const std::string &filename)
@@ -282,6 +283,10 @@ ReadVtkHdf::ReadVtkHdf(const std::string &name, int moduleID, mpi::communicator 
     setParallelizationMode(ParallelizeTimeAndBlocks);
     observeParameter(m_filename);
     observeParameter(m_detectSeries);
+
+#if defined(MODULE_THREAD) && !defined(H5_HAVE_THREADSAFE)
+    sendWarning("HDF5 library is not thread-safe, multiple modules must not use hdf5 at the same time!");
+#endif
 }
 
 // collect files that only differ in the trailing number of their name
@@ -291,6 +296,7 @@ void ReadVtkHdf::findSeries(const std::string &filename)
     m_series = false;
     m_files.clear();
     m_fileTimes.clear();
+    m_reportedFileSteps.clear();
     if (!m_detectSeries->getValue())
         return;
 
@@ -364,8 +370,9 @@ bool ReadVtkHdf::examine(const Parameter *param)
         updateChoices();
         return false;
     }
-
+#ifndef H5_HAVE_THREADSAFE
     std::lock_guard<std::mutex> guard(hdf5Mutex);
+#endif
     setExternalPrefix(filename);
     Handle file(H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT), H5Fclose);
     if (!file.valid()) {
@@ -524,6 +531,7 @@ bool ReadVtkHdf::examine(const Parameter *param)
             }
             m_fileTimes.push_back(t);
         }
+        m_reportedFileSteps.resize(m_files.size(), 0);
         setTimesteps(m_files.size());
     }
 
@@ -548,22 +556,42 @@ bool ReadVtkHdf::read(Token &token, int timestep, int block)
             return true;
         filename = m_files[timestep];
         realTime = m_fileTimes[timestep];
+        {
+            if (!m_reportedFileSteps[timestep]) {
+                sendInfo("timestep %d uses file %s", timestep, filename.c_str());
+                m_reportedFileSteps[timestep] = 1;
+            }
+        }
+    }
+    std::stringstream output;
+    output << "ReadVtkHdf: reading " << filename << " timestep " << timestep << " block " << block << std::endl;
+    std::cerr << output.str();
+    Outputs outputs;
+    {
+#ifndef H5_HAVE_THREADSAFE
+        std::lock_guard<std::mutex> guard(hdf5Mutex);
+#endif
+        setExternalPrefix(filename);
+        Handle file(H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT), H5Fclose);
+        if (!file.valid()) {
+            sendError("could not open %s", filename.c_str());
+            return false;
+        }
+
+        bool ok = m_type == DataType::ImageData
+                      ? readImage(token, outputs, file, block, m_series ? timestep : -1, realTime)
+                      : readUnstructured(token, outputs, file, timestep, block);
+        if (!ok)
+            return false;
     }
 
-    std::lock_guard<std::mutex> guard(hdf5Mutex);
-    setExternalPrefix(filename);
-    Handle file(H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT), H5Fclose);
-    if (!file.valid()) {
-        sendError("could not open %s", filename.c_str());
-        return false;
-    }
-
-    if (m_type == DataType::ImageData)
-        return readImage(token, file, block, m_series ? timestep : -1, realTime);
-    return readUnstructured(token, file, timestep, block);
+    // adding objects may block on the previous token, so do it without holding the HDF5 lock
+    for (auto &out: outputs)
+        token.addObject(out.first, out.second);
+    return true;
 }
 
-bool ReadVtkHdf::readUnstructured(Token &token, hid_t file, int timestep, int block)
+bool ReadVtkHdf::readUnstructured(Token &token, Outputs &outputs, hid_t file, int timestep, int block)
 {
     const int step = m_temporal ? timestep : 0;
     const long long firstPart = m_temporal ? m_steps.partOffsets[step] : 0;
@@ -759,7 +787,10 @@ bool ReadVtkHdf::readUnstructured(Token &token, hid_t file, int timestep, int bl
         grid->setRealTime(realTime);
     }
     token.applyMeta(grid);
-    token.addObject(m_gridOut, grid);
+    std::stringstream output;
+    output << "ReadVtkHdf: addObject grid timestep " << timestep << " block " << block << std::endl;
+    std::cerr << output.str();
+    outputs.emplace_back(m_gridOut, grid);
 
     FieldRange range;
     range.pointRow = sumBefore(m_numPoints, firstPart, block);
@@ -769,10 +800,10 @@ bool ReadVtkHdf::readUnstructured(Token &token, hid_t file, int timestep, int bl
     range.pointStepOffset = pointStepOffset;
     range.cellStepOffset = cellStepOffset;
     range.cellMap = cellMap.empty() ? nullptr : &cellMap;
-    return addFields(token, file, grid, range, step, outStep, block, realTime);
+    return addFields(token, outputs, file, grid, range, step, outStep, block, realTime);
 }
 
-bool ReadVtkHdf::readImage(Token &token, hid_t file, int block, int timestep, double realTime)
+bool ReadVtkHdf::readImage(Token &token, Outputs &outputs, hid_t file, int block, int timestep, double realTime)
 {
     if (block > 0)
         return true;
@@ -792,7 +823,10 @@ bool ReadVtkHdf::readImage(Token &token, hid_t file, int block, int timestep, do
         grid->setRealTime(realTime);
     }
     token.applyMeta(grid);
-    token.addObject(m_gridOut, grid);
+    std::stringstream output;
+    output << "ReadVtkHdf: addObject field timestep " << timestep << " block " << block << std::endl;
+    std::cerr << output.str();
+    outputs.emplace_back(m_gridOut, grid);
 
     FieldRange range;
     range.numPoints = n[0] * n[1] * n[2];
@@ -802,11 +836,11 @@ bool ReadVtkHdf::readImage(Token &token, hid_t file, int block, int timestep, do
         c[i] = std::max<long long>(1, m_extent[2 * i + 1] - m_extent[2 * i]);
     range.numCells = c[0] * c[1] * c[2];
     range.cellRows = c[2];
-    return addFields(token, file, grid, range, 0, timestep, 0, realTime);
+    return addFields(token, outputs, file, grid, range, 0, timestep, 0, realTime);
 }
 
-bool ReadVtkHdf::addFields(Token &token, hid_t file, Object::const_ptr grid, const FieldRange &range, int step,
-                           int timestep, int block, double realTime)
+bool ReadVtkHdf::addFields(Token &token, Outputs &outputs, hid_t file, Object::const_ptr grid, const FieldRange &range,
+                           int step, int timestep, int block, double realTime)
 {
     const bool image = m_type == DataType::ImageData;
     for (int i = 0; i < NumFields; ++i) {
@@ -878,7 +912,9 @@ bool ReadVtkHdf::addFields(Token &token, hid_t file, Object::const_ptr grid, con
         }
         obj->describe(field, id());
         token.applyMeta(obj);
-        token.addObject(m_fieldOut[i], obj);
+        std::cerr << "adding field " << field << ", timestep " << timestep << ", block " << block << std::endl;
+
+        outputs.emplace_back(m_fieldOut[i], obj);
     }
     return true;
 }
