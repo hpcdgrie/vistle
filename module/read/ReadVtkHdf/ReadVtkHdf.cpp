@@ -223,6 +223,31 @@ long long numComponents(const std::vector<hsize_t> &dims, bool image, long long 
     return rows > 0 ? total / rows : 0;
 }
 
+// order p of a VTK Lagrange quadrilateral with n nodes ((p+1)^2), 0 if n does not match
+int lagrangeQuadOrder(long long n)
+{
+    int p = static_cast<int>(std::lround(std::sqrt(static_cast<double>(n)))) - 1;
+    return p >= 1 && (long long)(p + 1) * (p + 1) == n ? p : 0;
+}
+
+// position within the node list of a Lagrange quadrilateral for lattice point (i, j), 0 <= i, j <= p
+// ordering: 4 corners, then the edge nodes (bottom, right, top, left), then the interior nodes
+Index lagrangeQuadIndex(int i, int j, int p)
+{
+    const bool ib = i == 0 || i == p;
+    const bool jb = j == 0 || j == p;
+    if (ib && jb)
+        return i ? (j ? 2 : 1) : (j ? 3 : 0);
+    Index offset = 4;
+    if (ib || jb) {
+        if (!ib)
+            return offset + (i - 1) + (j ? (p - 1) + (p - 1) : 0);
+        return offset + (j - 1) + (i ? (p - 1) : 2 * (p - 1) + (p - 1));
+    }
+    offset += 4 * (p - 1);
+    return offset + (i - 1) + (p - 1) * (j - 1);
+}
+
 long long sumBefore(const std::vector<long long> &v, long long first, long long n)
 {
     long long sum = 0;
@@ -569,17 +594,10 @@ bool ReadVtkHdf::readUnstructured(Token &token, hid_t file, int timestep, int bl
         return false;
     }
 
-    auto grid = std::make_shared<UnstructuredGrid>(nc, nconn, np);
-    Scalar *x = grid->x().data(), *y = grid->y().data(), *z = grid->z().data();
-    for (long long i = 0; i < np; ++i) {
-        x[i] = points[3 * i];
-        y[i] = points[3 * i + 1];
-        z[i] = points[3 * i + 2];
-    }
-
-    Index *el = grid->el().data();
-    Index *cl = grid->cl().data();
-    Byte *tl = grid->tl().data();
+    std::vector<Index> el(nc + 1), cl(nconn);
+    std::vector<Byte> tl(nc);
+    // cells with more than the corner nodes that are split into several linear cells
+    std::vector<long long> refined;
     for (long long i = 0; i < nconn; ++i) {
         if (connectivity[i] < 0 || connectivity[i] >= np) {
             sendError("invalid connectivity in block %d", block);
@@ -639,8 +657,12 @@ bool ReadVtkHdf::readUnstructured(Token &token, hid_t file, int timestep, int bl
                 UnstructuredGrid::BAR,         UnstructuredGrid::TRIANGLE,   UnstructuredGrid::QUAD,
                 UnstructuredGrid::TETRAHEDRON, UnstructuredGrid::HEXAHEDRON, UnstructuredGrid::PRISM};
             const auto t = lagrange[types[i] - 68];
-            if (el[i + 1] - el[i] == UnstructuredGrid::NumVertices[t]) {
+            const Index n = el[i + 1] - el[i];
+            if (n == UnstructuredGrid::NumVertices[t]) {
                 tl[i] = t;
+            } else if (types[i] == 70 && lagrangeQuadOrder(n) > 1) {
+                tl[i] = UnstructuredGrid::QUAD;
+                refined.push_back(i);
             } else {
                 tl[i] = UnstructuredGrid::NONE;
                 ++unhandled;
@@ -678,6 +700,56 @@ bool ReadVtkHdf::readUnstructured(Token &token, hid_t file, int timestep, int bl
         sendWarning("block %d: %lld cells of unsupported VTK type (%s) skipped", block, unhandled, list.c_str());
     }
 
+    // split high-order Lagrange quadrilaterals into p*p linear quadrilaterals
+    std::vector<Index> cellMap;
+    if (!refined.empty()) {
+        std::vector<Index> nel, ncl;
+        std::vector<Byte> ntl;
+        nel.reserve(el.size());
+        ncl.reserve(cl.size());
+        ntl.reserve(tl.size());
+        nel.push_back(0);
+        size_t r = 0;
+        for (long long i = 0; i < nc; ++i) {
+            const Index *nodes = cl.data() + el[i];
+            if (r < refined.size() && refined[r] == i) {
+                ++r;
+                const int p = lagrangeQuadOrder(el[i + 1] - el[i]);
+                for (int j = 0; j < p; ++j) {
+                    for (int k = 0; k < p; ++k) {
+                        ncl.push_back(nodes[lagrangeQuadIndex(k, j, p)]);
+                        ncl.push_back(nodes[lagrangeQuadIndex(k + 1, j, p)]);
+                        ncl.push_back(nodes[lagrangeQuadIndex(k + 1, j + 1, p)]);
+                        ncl.push_back(nodes[lagrangeQuadIndex(k, j + 1, p)]);
+                        ntl.push_back(UnstructuredGrid::QUAD);
+                        nel.push_back(ncl.size());
+                        cellMap.push_back(i);
+                    }
+                }
+            } else {
+                ncl.insert(ncl.end(), nodes, nodes + (el[i + 1] - el[i]));
+                ntl.push_back(tl[i]);
+                nel.push_back(ncl.size());
+                cellMap.push_back(i);
+            }
+        }
+        el = std::move(nel);
+        cl = std::move(ncl);
+        tl = std::move(ntl);
+    }
+
+    const size_t numOutCells = tl.size();
+    auto grid = std::make_shared<UnstructuredGrid>(numOutCells, cl.size(), np);
+    Scalar *x = grid->x().data(), *y = grid->y().data(), *z = grid->z().data();
+    for (long long i = 0; i < np; ++i) {
+        x[i] = points[3 * i];
+        y[i] = points[3 * i + 1];
+        z[i] = points[3 * i + 2];
+    }
+    std::copy(el.begin(), el.end(), grid->el().data());
+    std::copy(cl.begin(), cl.end(), grid->cl().data());
+    std::copy(tl.begin(), tl.end(), grid->tl().data());
+
     const bool timeVarying = m_temporal || m_series;
     const int outStep = timeVarying ? timestep : -1;
     const double realTime = m_temporal ? m_steps.values[step] : m_series ? m_fileTimes[timestep] : 0.;
@@ -696,6 +768,7 @@ bool ReadVtkHdf::readUnstructured(Token &token, hid_t file, int timestep, int bl
     range.cellRows = range.numCells = nc;
     range.pointStepOffset = pointStepOffset;
     range.cellStepOffset = cellStepOffset;
+    range.cellMap = cellMap.empty() ? nullptr : &cellMap;
     return addFields(token, file, grid, range, step, outStep, block, realTime);
 }
 
@@ -771,18 +844,28 @@ bool ReadVtkHdf::addFields(Token &token, hid_t file, Object::const_ptr grid, con
             continue;
         }
 
+        // cells that have been split: replicate the value of the original cell
+        const bool mapped = !point && range.cellMap;
+        const long long outTuples = mapped ? (long long)range.cellMap->size() : tuples;
+        auto src = [&](long long j) {
+            return mapped ? (long long)(*range.cellMap)[j] : j;
+        };
+
         DataBase::ptr obj;
         if (ncomp == 1) {
-            auto v = std::make_shared<Vec<Scalar, 1>>(tuples);
-            std::copy(data.begin(), data.end(), v->x().data());
+            auto v = std::make_shared<Vec<Scalar, 1>>(outTuples);
+            Scalar *x = v->x().data();
+            for (long long j = 0; j < outTuples; ++j)
+                x[j] = data[src(j)];
             obj = v;
         } else {
-            auto v = std::make_shared<Vec<Scalar, 3>>(tuples);
+            auto v = std::make_shared<Vec<Scalar, 3>>(outTuples);
             Scalar *x = v->x().data(), *y = v->y().data(), *z = v->z().data();
-            for (long long j = 0; j < tuples; ++j) {
-                x[j] = data[3 * j];
-                y[j] = data[3 * j + 1];
-                z[j] = data[3 * j + 2];
+            for (long long j = 0; j < outTuples; ++j) {
+                const long long s = src(j);
+                x[j] = data[3 * s];
+                y[j] = data[3 * s + 1];
+                z[j] = data[3 * s + 2];
             }
             obj = v;
         }

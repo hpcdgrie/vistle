@@ -32,6 +32,8 @@ private:
         long long pointRow = 0, pointRows = 0, numPoints = 0;
         long long cellRow = 0, cellRows = 0, numCells = 0;
         long long pointStepOffset = 0, cellStepOffset = 0;
+        // for refined cells: index of the original cell for every cell of the grid
+        const std::vector<vistle::Index> *cellMap = nullptr;
     };
 
     bool readUnstructured(Token &token, hid_t file, int timestep, int block);
