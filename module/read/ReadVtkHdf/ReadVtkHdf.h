@@ -35,17 +35,23 @@ private:
     };
 
     bool readUnstructured(Token &token, hid_t file, int timestep, int block);
-    bool readImage(Token &token, hid_t file, int block);
+    bool readImage(Token &token, hid_t file, int block, int timestep, double realTime);
+    void findSeries(const std::string &filename);
     bool addFields(Token &token, hid_t file, vistle::Object::const_ptr grid, const FieldRange &range, int step,
                    int timestep, int block, double realTime);
 
     vistle::StringParameter *m_filename = nullptr;
+    vistle::IntParameter *m_detectSeries = nullptr;
     vistle::StringParameter *m_fieldChoice[NumFields] = {};
     vistle::Port *m_gridOut = nullptr;
     vistle::Port *m_fieldOut[NumFields] = {};
 
     DataType m_type = DataType::None;
     bool m_temporal = false;
+    // one file per time step, e.g. results_0.hdf, results_1.hdf, ...
+    bool m_series = false;
+    std::vector<std::string> m_files;
+    std::vector<double> m_fileTimes;
     StepInfo m_steps;
     std::vector<long long> m_numPoints, m_numCells, m_numConnectivity;
     long long m_extent[6] = {0, 0, 0, 0, 0, 0};

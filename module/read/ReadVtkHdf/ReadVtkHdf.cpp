@@ -8,8 +8,10 @@
 #include <vistle/core/unstr.h>
 #include <vistle/core/uniformgrid.h>
 #include <vistle/core/vec.h>
+#include <vistle/util/filesystem.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstring>
 #include <memory>
@@ -248,17 +250,77 @@ ReadVtkHdf::ReadVtkHdf(const std::string &name, int moduleID, mpi::communicator 
         linkPortAndParameter(m_fieldOut[i], m_fieldChoice[i]);
     }
 
+    m_detectSeries =
+        addIntParameter("file_series", "read files with consecutive numbers at the end of their name as time steps",
+                        true, Parameter::Boolean);
+
     setParallelizationMode(ParallelizeTimeAndBlocks);
     observeParameter(m_filename);
+    observeParameter(m_detectSeries);
+}
+
+// collect files that only differ in the trailing number of their name
+void ReadVtkHdf::findSeries(const std::string &filename)
+{
+    namespace fs = vistle::filesystem;
+    m_series = false;
+    m_files.clear();
+    m_fileTimes.clear();
+    if (!m_detectSeries->getValue())
+        return;
+
+    try {
+        const fs::path path(filename);
+        const std::string stem = path.stem().string();
+        const std::string ext = path.extension().string();
+        size_t b = stem.size();
+        while (b > 0 && std::isdigit(static_cast<unsigned char>(stem[b - 1])))
+            --b;
+        if (b == stem.size())
+            return;
+        const std::string prefix = stem.substr(0, b);
+
+        fs::path dir = path.parent_path();
+        if (dir.empty())
+            dir = fs::path(".");
+
+        std::vector<std::pair<long long, std::string>> found;
+        for (fs::directory_iterator it(dir), end; it != end; ++it) {
+            const fs::path p = it->path();
+            if (p.extension().string() != ext)
+                continue;
+            const std::string s = p.stem().string();
+            if (s.size() <= prefix.size() || s.compare(0, prefix.size(), prefix) != 0)
+                continue;
+            const std::string num = s.substr(prefix.size());
+            if (num.size() > 18 || !std::all_of(num.begin(), num.end(),
+                                                [](char c) { return std::isdigit(static_cast<unsigned char>(c)); }))
+                continue;
+            found.emplace_back(std::stoll(num), p.string());
+        }
+        if (found.size() < 2)
+            return;
+        std::sort(found.begin(), found.end());
+        for (const auto &f: found)
+            m_files.push_back(f.second);
+        m_series = true;
+    } catch (std::exception &ex) {
+        sendWarning("failed to scan for file series: %s", ex.what());
+        m_series = false;
+        m_files.clear();
+    }
 }
 
 bool ReadVtkHdf::examine(const Parameter *param)
 {
-    if (param && param != m_filename)
+    if (param && param != m_filename && param != m_detectSeries)
         return true;
 
     m_type = DataType::None;
     m_temporal = false;
+    m_series = false;
+    m_files.clear();
+    m_fileTimes.clear();
     m_steps = StepInfo();
     m_numPoints.clear();
     m_numCells.clear();
@@ -421,6 +483,25 @@ bool ReadVtkHdf::examine(const Parameter *param)
     }
     updateChoices();
 
+    findSeries(filename);
+    if (m_series) {
+        if (m_temporal)
+            sendWarning("file series: ignoring time steps within the individual files");
+        m_temporal = false;
+        // the file with the lowest number is the reference for time 0, if no explicit time is stored
+        for (size_t i = 0; i < m_files.size(); ++i) {
+            double t = static_cast<double>(i);
+            Handle f(H5Fopen(m_files[i].c_str(), H5F_ACC_RDONLY, H5P_DEFAULT), H5Fclose);
+            if (f.valid()) {
+                std::vector<double> tv;
+                if (readAll(f, "/time", H5T_NATIVE_DOUBLE, tv) && tv.size() == 1)
+                    t = tv[0];
+            }
+            m_fileTimes.push_back(t);
+        }
+        setTimesteps(m_files.size());
+    }
+
     setPartitions(numParts);
     return true;
 }
@@ -429,21 +510,31 @@ bool ReadVtkHdf::read(Token &token, int timestep, int block)
 {
     if (m_type == DataType::None)
         return false;
-    if (m_temporal && timestep < 0)
+    const bool timeVarying = m_temporal || m_series;
+    if (timeVarying && timestep < 0)
         return true;
-    if (!m_temporal && timestep >= 0)
+    if (!timeVarying && timestep >= 0)
         return true;
 
+    std::string filename = m_filename->getValue();
+    double realTime = 0.;
+    if (m_series) {
+        if (timestep >= (int)m_files.size())
+            return true;
+        filename = m_files[timestep];
+        realTime = m_fileTimes[timestep];
+    }
+
     std::lock_guard<std::mutex> guard(hdf5Mutex);
-    setExternalPrefix(m_filename->getValue());
-    Handle file(H5Fopen(m_filename->getValue().c_str(), H5F_ACC_RDONLY, H5P_DEFAULT), H5Fclose);
+    setExternalPrefix(filename);
+    Handle file(H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT), H5Fclose);
     if (!file.valid()) {
-        sendError("could not open %s", m_filename->getValue().c_str());
+        sendError("could not open %s", filename.c_str());
         return false;
     }
 
     if (m_type == DataType::ImageData)
-        return readImage(token, file, block);
+        return readImage(token, file, block, m_series ? timestep : -1, realTime);
     return readUnstructured(token, file, timestep, block);
 }
 
@@ -587,9 +678,11 @@ bool ReadVtkHdf::readUnstructured(Token &token, hid_t file, int timestep, int bl
         sendWarning("block %d: %lld cells of unsupported VTK type (%s) skipped", block, unhandled, list.c_str());
     }
 
-    const double realTime = m_temporal ? m_steps.values[step] : 0.;
+    const bool timeVarying = m_temporal || m_series;
+    const int outStep = timeVarying ? timestep : -1;
+    const double realTime = m_temporal ? m_steps.values[step] : m_series ? m_fileTimes[timestep] : 0.;
     grid->setBlock(block);
-    if (m_temporal) {
+    if (timeVarying) {
         grid->setTimestep(timestep);
         grid->setRealTime(realTime);
     }
@@ -603,10 +696,10 @@ bool ReadVtkHdf::readUnstructured(Token &token, hid_t file, int timestep, int bl
     range.cellRows = range.numCells = nc;
     range.pointStepOffset = pointStepOffset;
     range.cellStepOffset = cellStepOffset;
-    return addFields(token, file, grid, range, step, m_temporal ? timestep : -1, block, realTime);
+    return addFields(token, file, grid, range, step, outStep, block, realTime);
 }
 
-bool ReadVtkHdf::readImage(Token &token, hid_t file, int block)
+bool ReadVtkHdf::readImage(Token &token, hid_t file, int block, int timestep, double realTime)
 {
     if (block > 0)
         return true;
@@ -621,6 +714,10 @@ bool ReadVtkHdf::readImage(Token &token, hid_t file, int block)
         grid->max()[c] = m_origin[c] + m_extent[2 * c + 1] * m_spacing[c];
     }
     grid->setBlock(0);
+    if (timestep >= 0) {
+        grid->setTimestep(timestep);
+        grid->setRealTime(realTime);
+    }
     token.applyMeta(grid);
     token.addObject(m_gridOut, grid);
 
@@ -632,7 +729,7 @@ bool ReadVtkHdf::readImage(Token &token, hid_t file, int block)
         c[i] = std::max<long long>(1, m_extent[2 * i + 1] - m_extent[2 * i]);
     range.numCells = c[0] * c[1] * c[2];
     range.cellRows = c[2];
-    return addFields(token, file, grid, range, 0, -1, 0, 0.);
+    return addFields(token, file, grid, range, 0, timestep, 0, realTime);
 }
 
 bool ReadVtkHdf::addFields(Token &token, hid_t file, Object::const_ptr grid, const FieldRange &range, int step,
