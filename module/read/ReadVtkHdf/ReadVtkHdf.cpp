@@ -280,6 +280,11 @@ ReadVtkHdf::ReadVtkHdf(const std::string &name, int moduleID, mpi::communicator 
         addIntParameter("file_series", "read files with consecutive numbers at the end of their name as time steps",
                         true, Parameter::Boolean);
 
+    m_refineLagrange = addIntParameter("refine_lagrange_cells",
+                                       "split high-order Lagrange quadrilaterals into linear cells (otherwise replace "
+                                       "them by one linear cell using only the corner vertices)",
+                                       false, Parameter::Boolean);
+
     setParallelizationMode(ParallelizeTimeAndBlocks);
     observeParameter(m_filename);
     observeParameter(m_detectSeries);
@@ -743,6 +748,14 @@ bool ReadVtkHdf::readUnstructured(Token &token, Outputs &outputs, hid_t file, in
             if (r < refined.size() && refined[r] == i) {
                 ++r;
                 const int p = lagrangeQuadOrder(el[i + 1] - el[i]);
+                if (!m_refineLagrange->getValue()) {
+                    // a single linear cell from the corner vertices (the first four nodes)
+                    ncl.insert(ncl.end(), nodes, nodes + 4);
+                    ntl.push_back(UnstructuredGrid::QUAD);
+                    nel.push_back(ncl.size());
+                    cellMap.push_back(i);
+                    continue;
+                }
                 for (int j = 0; j < p; ++j) {
                     for (int k = 0; k < p; ++k) {
                         ncl.push_back(nodes[lagrangeQuadIndex(k, j, p)]);
