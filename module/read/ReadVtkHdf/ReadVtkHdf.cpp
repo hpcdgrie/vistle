@@ -17,6 +17,7 @@
 #include <memory>
 #include <set>
 #include <mutex>
+#include <unordered_map>
 
 using namespace vistle;
 
@@ -249,6 +250,64 @@ Index lagrangeQuadIndex(int i, int j, int p)
     return offset + (i - 1) + (p - 1) * (j - 1);
 }
 
+// flip triangles/quadrilaterals so that neighbouring cells traverse shared edges in opposite directions
+size_t orientSurface(const std::vector<Index> &el, std::vector<Index> &cl, const std::vector<Byte> &tl, Index numPoints)
+{
+    const size_t nc = tl.size();
+    auto isSurface = [&](size_t c) {
+        return tl[c] == UnstructuredGrid::TRIANGLE || tl[c] == UnstructuredGrid::QUAD;
+    };
+    auto key = [numPoints](Index a, Index b) {
+        return (uint64_t)std::min(a, b) * numPoints + std::max(a, b);
+    };
+
+    // undirected edge -> (cell, edge runs from lower to higher vertex index)
+    std::unordered_map<uint64_t, std::vector<std::pair<size_t, bool>>> edges;
+    for (size_t c = 0; c < nc; ++c) {
+        if (!isSurface(c))
+            continue;
+        const Index n = el[c + 1] - el[c];
+        for (Index k = 0; k < n; ++k) {
+            const Index a = cl[el[c] + k], b = cl[el[c] + (k + 1) % n];
+            edges[key(a, b)].emplace_back(c, a < b);
+        }
+    }
+
+    std::vector<char> visited(nc, 0), flip(nc, 0);
+    std::vector<size_t> queue;
+    for (size_t s = 0; s < nc; ++s) {
+        if (visited[s] || !isSurface(s))
+            continue;
+        visited[s] = 1;
+        queue.assign(1, s);
+        while (!queue.empty()) {
+            const size_t c = queue.back();
+            queue.pop_back();
+            const Index n = el[c + 1] - el[c];
+            for (Index k = 0; k < n; ++k) {
+                const Index a = cl[el[c] + k], b = cl[el[c] + (k + 1) % n];
+                const bool dirC = (a < b) != (flip[c] != 0);
+                for (const auto &nb: edges[key(a, b)]) {
+                    if (visited[nb.first])
+                        continue;
+                    visited[nb.first] = 1;
+                    flip[nb.first] = nb.second == dirC;
+                    queue.push_back(nb.first);
+                }
+            }
+        }
+    }
+
+    size_t flipped = 0;
+    for (size_t c = 0; c < nc; ++c) {
+        if (flip[c]) {
+            std::reverse(cl.begin() + el[c], cl.begin() + el[c + 1]);
+            ++flipped;
+        }
+    }
+    return flipped;
+}
+
 long long sumBefore(const std::vector<long long> &v, long long first, long long n)
 {
     long long sum = 0;
@@ -283,6 +342,10 @@ ReadVtkHdf::ReadVtkHdf(const std::string &name, int moduleID, mpi::communicator 
     m_refineLagrange = addIntParameter("refine_lagrange_cells",
                                        "split high-order Lagrange quadrilaterals into linear cells (otherwise replace "
                                        "them by one linear cell using only the corner vertices)",
+                                       false, Parameter::Boolean);
+
+    m_fixOrientation = addIntParameter("fix_orientation",
+                                       "flip triangles and quadrilaterals whose orientation disagrees with a neighbour",
                                        false, Parameter::Boolean);
 
     setParallelizationMode(ParallelizeTimeAndBlocks);
@@ -778,6 +841,9 @@ bool ReadVtkHdf::readUnstructured(Token &token, Outputs &outputs, hid_t file, in
         cl = std::move(ncl);
         tl = std::move(ntl);
     }
+
+    if (m_fixOrientation->getValue())
+        orientSurface(el, cl, tl, np);
 
     const size_t numOutCells = tl.size();
     auto grid = std::make_shared<UnstructuredGrid>(numOutCells, cl.size(), np);

@@ -49,6 +49,7 @@ private:
     vistle::StringParameter *m_filename = nullptr;
     vistle::IntParameter *m_detectSeries = nullptr;
     vistle::IntParameter *m_refineLagrange = nullptr;
+    vistle::IntParameter *m_fixOrientation = nullptr;
     vistle::StringParameter *m_fieldChoice[NumFields] = {};
     vistle::Port *m_gridOut = nullptr;
     vistle::Port *m_fieldOut[NumFields] = {};
